@@ -8,6 +8,14 @@ import SwiftUI
 
 struct HistoryView: View {
     var body: some View{
-        Text("HistoryView")
+        List(1...20, id: \.self) { number in
+            Text("\(number)")
+        }
+        .navigationTitle("History")
     }
+        
+}
+
+#Preview {
+    HistoryView()
 }

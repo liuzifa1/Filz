@@ -9,11 +9,12 @@ import SwiftUI
 
 // MARK: -
 struct SendView: View {
+    // MARK: Body
     var body: some View {
-        NavigationStack {
-            Text("This is send view")
-                .navigationTitle("Select destination")
-                .navigationBarTitleDisplayMode(.inline)
-        }
+        Text("1")
     }
+}
+
+#Preview {
+    SendView()
 }
