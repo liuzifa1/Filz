@@ -30,6 +30,7 @@ struct ContentView: View {
    @Environment(\.modelContext) private var modelContext
    // This is prepared for opening settings view
    @State private var showSettingsPage = false
+   // Manuly control the tab bar visibility, just in case
    @State private var shouldMinimizeTabBar = false
    // initalize a varrible filetype for UI & sets its default into photo
    @State private var choosedFileType: fileType = .photo
@@ -44,14 +45,7 @@ struct ContentView: View {
                   .navigationTitle("Sponge Bob")
                   .toolbarTitleDisplayMode(.inlineLarge)
                   .toolbar {
-                     ToolbarItem (placement: .topBarTrailing) {
-                        Button {
-                           
-                        }
-                        label: {
-                           Image(systemName: "gearshape")
-                        }
-                     }
+                     // Choose button
                      ToolbarItem (placement: .topBarTrailing) {
                         Button {
                            
@@ -60,14 +54,31 @@ struct ContentView: View {
                            Text("選択")
                         }
                      }
+                     // Avatar button
+                     ToolbarItem (placement: .topBarTrailing) {
+                        Button {
+                           showSettingsPage = true
+                        }
+                        label: {
+                           Image("avatarFr")
+                              .resizable()
+                              .scaledToFill()
+                              .frame(width: 44, height: 44)
+                              .clipShape(Circle())
+                        }
+                     }
                      .sharedBackgroundVisibility(.hidden)
+                  }
+                  // Sheet out settings page
+                  .sheet(isPresented: $showSettingsPage) {
+                     SettingsView()
                   }
             }
          }
          // Tab for History
          Tab("History", systemImage: "clock.fill") {
             NavigationStack {
-               SendView()
+               HistoryView()
                   .navigationTitle("History")
                   .toolbarTitleDisplayMode(.inlineLarge)
                   .toolbar {
