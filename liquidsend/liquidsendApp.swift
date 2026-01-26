@@ -8,11 +8,17 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - App entry
+
 @main
 struct liquidsendApp: App {
-   var body: some Scene {
+    @State private var coreStatus = CoreStatus() // Check core status through a observable
+    
+    var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(coreStatus) // import to environment
         }
+        .modelContainer(for: SettingsModel.self)
     }
 }

@@ -28,12 +28,21 @@ enum fileType: Int, CaseIterable, Hashable, Identifiable {
 struct ContentView: View {
    // MARK: variables
    @Environment(\.modelContext) private var modelContext
-   // This is prepared for opening settings view
-   @State private var showSettingsPage = false
-   // Manuly control the tab bar visibility, just in case
-   @State private var shouldMinimizeTabBar = false
-   // initalize a varrible filetype for UI & sets its default into photo
-   @State private var choosedFileType: fileType = .photo
+   @Query private var settings: [SettingsModel] // Fetch settings model from swiftdata
+   
+   @State private var showSettingsPage = false // Used for opening settings view
+   @State private var shouldMinimizeTabBar = false // Manuly control the tab bar visibility, just in case
+   @State private var choosedFileType: fileType = .photo // initalize a varrible filetype for UI & sets its default into photo
+   
+   private var setting: SettingsModel {
+           if let existing = settings.first{
+               return existing
+           } else {
+               let new = SettingsModel()
+               modelContext.insert(new)
+               return new
+           }
+       }
    
    // MARK: Body
    var body: some View {
@@ -42,7 +51,7 @@ struct ContentView: View {
          Tab("Send", systemImage: "paperplane.fill") {
             NavigationStack {
                SendView()
-                  .navigationTitle("Sponge Bob")
+                  .navigationTitle(setting.userName)
                   .toolbarTitleDisplayMode(.inlineLarge)
                   .toolbar {
                      // Choose button
@@ -107,4 +116,6 @@ struct ContentView: View {
 
 #Preview {
    ContentView()
+      .modelContainer(for: SettingsModel.self, inMemory: true)
+      .environment(CoreStatus())
 }

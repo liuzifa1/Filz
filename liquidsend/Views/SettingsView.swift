@@ -5,190 +5,194 @@
 //  Created by liu zifa1 on 1/16/26.
 //
 import SwiftUI
+import SwiftData
 
-// MARK: - Settings Variable here
-// TODO: Make it swift data
-enum deviceType: String, CaseIterable, Identifiable {
-    case iphone
-    case pc
-    case browser
-    case cli
-    case server
+// Main body for Settings view
+struct SettingsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var settingsList: [SettingsModel]
+    @Environment(\.dismiss) private var dismiss
     
-    var id: Self { self }
-    
-    // Title for each case
-    var title: String {
-        switch self {
-        case .iphone: return "iPhone"
-        case .pc: return "PC"
-        case .browser: return "Browser"
-        case .cli: return "CLI"
-        case .server: return "Server"
-        }
-    }
-    
-    // System image for each case
-    var systemImage: String {
-        switch self {
-        case .iphone: return "iphone"
-        case .pc: return "desktopcomputer"
-        case .browser: return "globe"
-        case .cli: return "terminal"
-        case .server: return "server.rack"
+    // Main body here, form view has been split from this view to imporove readability
+    var body: some View {
+        NavigationStack {
+            if let settings = settingsList.first {
+                SettingsFormView(settings: settings, dismiss: dismiss)
+            } else {
+                ProgressView()
+                    .onAppear {
+                        // Create default settings if none exist
+                        let newSettings = SettingsModel()
+                        modelContext.insert(newSettings)
+                    }
+            }
         }
     }
 }
 
-// MARK: - body here
-struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var testvar1 = false
-    @State private var testvar2 = false
-    @State private var testvar3 = false
-    @State private var testName = "Sponge Bob"
-    @State private var isAdvancedNetworkingOn = false
-    @State private var selectedDeviceIcon: deviceType = .iphone
-    @State private var discoveryTimeout: Int = 500 // Default value
-    let discoveryTimeoutOptions = [50,100,200,500,1000,5000]
+// Form View for Settings
+struct SettingsFormView: View {
+    @State var coreStatus = CoreStatus()
+    
+    @Bindable var settings: SettingsModel // Import from SwiftData, and make it bindable
+    var dismiss: DismissAction // Import dismiss function
+    let discoveryTimeoutOptions = [50, 100, 200, 500, 1000, 5000] // Cause I'm using a picker thus the time out option is pre-given in here
     
     var body: some View {
-        NavigationStack{
-            Form {
-                Section {
-                    // Profile Stack
-                    ZStack(alignment: .topLeading) {
-                        // Avatar Image
-                        Image("avatarFr")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 90) // Because u already set scalledToFill, so only width here should be ok
-                        VStack(alignment: .leading) {
-                            // HStack for name
-                            HStack {
-                                TextField("Enter your name", text: $testName)
-                                    .font(.system(size: 23, weight: .bold, design: .default))
-                                    .underline(true, color: .gray)
-                                Image(systemName: "pencil.line")
-                                    .foregroundStyle(.secondary)
-                                    .scaleEffect(1.5)
-                                    .offset(y: 3)
-
-                            }
-                            // HStack for server status
-                            HStack {
+        Form {
+            Section {
+            // Profile Stack
+                HStack(alignment: .top) {
+                    /// Avatar Image
+                    Image("avatarFr")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 90)
+                    /// All the text
+                    VStack(alignment: .leading) {
+                        /// HStack for name
+                        HStack {
+                            TextField("Enter your name", text: $settings.userName)
+                                .font(.system(size: 23, weight: .bold, design: .default))
+                                .underline(true, color: .gray)
+                            Image(systemName: "pencil.line")
+                                .foregroundStyle(.secondary)
+                                .scaleEffect(1.5)
+                                .offset(x: -10, y: 3)
+                        }
+                        /// HStack for server status
+                        HStack {
+//                            Image(systemName: "checkmark.circle.fill")
+//                                .foregroundStyle(.green)
+//                            Text("Server Operational_")
+//                                .foregroundStyle(.secondary)
+//                                .italic()
+//                        }
+                            if coreStatus.isCoreRunning {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                                 Text("Server Operational_")
                                     .foregroundStyle(.secondary)
                                     .italic()
-                            }
-                            // HStack for network status
-                            HStack {
-                                Image(systemName: "network")
-                                Text("192.168.1.1@4570")
+                            } else {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
+                                Text("Server Down_")
                                     .foregroundStyle(.secondary)
                                     .italic()
                             }
                         }
-                        .offset(x: 116, y: 5)
-                    }
-                }
-                // Receive Section
-                Section(header: Text("Receive")) {
-                    Toggle("Quick Save", isOn: $testvar1)
-                    Toggle("Quick Save for Favourites", isOn: $testvar2)
-                    Toggle("Require PIN", isOn: $testvar3)
-                    Toggle("Save media to gallery", isOn: $testvar1)
-                    Toggle("Auto Finish", isOn: $testvar1)
-                    Toggle("Save to history", isOn: $testvar1)
-                }
-                // Network Section
-                Section(header: Text("Network")) {
-                    // Advanced settings
-                    Toggle("Advanced Networking", isOn: $isAdvancedNetworkingOn)
-                    if isAdvancedNetworkingOn {
-                        Toggle("Auto accepct share link requests", isOn: $testvar1)
-                        // Device Icon Picker
-                        Picker("Device Icon", selection: $selectedDeviceIcon) {
-                            ForEach(deviceType.allCases) { device in
-                                Label(device.title, systemImage: device.systemImage)
-                                    .tag(device)
-                            }
-                        }
+                        /// HStack for network status
                         HStack {
-                            Text("Device Model")
-                            Spacer()
-                            TextField("", text: $testName)
-                                .multilineTextAlignment(.trailing)
+                            Image(systemName: "network")
+                            Text("192.168.1.1@4570")
                                 .foregroundStyle(.secondary)
+                                .italic()
                         }
-                        HStack {
-                            Text("Port")
-                            Spacer()
-                            TextField("", text: $testName)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(.secondary)
-                        }
-                        NavigationLink("Interface B/W List") {
-                            Text("Interface B/W List View")
-                        }
-                        // Discovery Timeout Picker
-                        HStack {
-                            Text("Discovery Timeout")
-                            Spacer()
-                            Picker("Timeout", selection: $discoveryTimeout) {
-                                ForEach(discoveryTimeoutOptions, id: \.self) { value in
-                                    Text("\(value) s")
-                                }
-                            }
-                            .pickerStyle(.menu)
-                        }
-                        
-                        Toggle("Encryption", isOn: $testvar1)
-                        
                     }
-                    Button("Restart Server") {
-                        
-                    }
-                    Button("Stop Server") {
-                        
-                    }
-                    .foregroundStyle(.red)
+                    .offset(y: 5)
                 }
-                // About Section
-                Section(header: Text("About")) {
-                    // App version HStack
+            }
+            // Developer Area
+            Section(header: Text("TestFlights")) {
+                Toggle("Toggle Sever Status", isOn: $coreStatus.isCoreRunning)
+            }
+            // Receive Section
+            Section(header: Text("Receive")) {
+                Toggle("Quick Save", isOn: $settings.quickSave)
+                Toggle("Quick Save for Favourites", isOn: $settings.quickSaveFavourites)
+                Toggle("Require PIN", isOn: $settings.requirePIN)
+                Toggle("Save media to gallery", isOn: $settings.saveMediaToGallery)
+                Toggle("Auto Finish", isOn: $settings.autoFinish)
+                Toggle("Save to history", isOn: $settings.saveToHistory)
+            }
+            // Network Section
+            Section(header: Text("Network")) {
+                // Advanced settings
+                Toggle("Advanced Networking", isOn: $settings.isAdvancedNetworkingOn)
+                if settings.isAdvancedNetworkingOn {
+                    Toggle("Auto accepct share link requests", isOn: $settings.autoAcceptShareLink)
+                    // Device Icon Picker
+                    Picker("Device Icon", selection: $settings.selectedDeviceIcon) {
+                        ForEach(DeviceType.allCases) { device in
+                            Label(device.title, systemImage: device.systemImage)
+                                .tag(device)
+                        }
+                    }
                     HStack {
-                        Text("App")
+                        Text("Device Model")
                         Spacer()
-                        Text("0.1_alpha")
+                        TextField("", text: $settings.deviceModel)
+                            .multilineTextAlignment(.trailing)
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("Localsend Core")
+                        Text("Port")
                         Spacer()
-                        Text("0.1.0")
+                        TextField("", text: $settings.port)
+                            .multilineTextAlignment(.trailing)
                             .foregroundStyle(.secondary)
                     }
-                    NavigationLink("About LocalSend") {
-                        AboutAppViewView()
+                    NavigationLink("Interface B/W List") {
+                        Text("Interface B/W List View")
                     }
+                    // Discovery Timeout Picker
+                    HStack {
+                        Text("Discovery Timeout")
+                        Spacer()
+                        Picker("Timeout", selection: $settings.discoveryTimeout) {
+                            ForEach(discoveryTimeoutOptions, id: \.self) { value in
+                                Text("\(value) s")
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    Toggle("Encryption", isOn: $settings.encryption)
+                    
+                }
+                Button("Restart Server") {
+                    
+                }
+                Button("Stop Server") {
+                    
+                }
+                .foregroundStyle(.red)
+            }
+            // About Section
+            Section(header: Text("About")) {
+                // App version HStack
+                HStack {
+                    Text("App")
+                    Spacer()
+                    Text("0.1_alpha")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Localsend Core")
+                        Spacer()
+                    Text("0.1.0")
+                        .foregroundStyle(.secondary)
+                }
+                NavigationLink("About LocalSend") {
+                    AboutAppView()
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button ("close",systemImage: "xmark") {
-                        dismiss()
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-            .toolbarTitleDisplayMode(.inline)
-            
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("close", systemImage: "xmark") {
+                    dismiss()
+                }
+            }
+        }
+        .navigationTitle("Settings")
+        .toolbarTitleDisplayMode(.inline)
     }
 }
+
 #Preview {
     SettingsView()
+        .modelContainer(for: SettingsModel.self, inMemory: true)
+        .environment(CoreStatus())
 }

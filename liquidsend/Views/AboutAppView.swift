@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct AboutAppViewView: View {
+struct AboutAppView: View {
     var body: some View {
         Text("Hello World")
     }
