@@ -26,6 +26,7 @@ pub struct ErrorResponse {
 pub struct RegisterDto {
     pub alias: String,
 
+    #[serde(default)]
     pub version: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,21 +35,36 @@ pub struct RegisterDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device_type: Option<DeviceType>,
 
+    #[serde(default, rename = "fingerprint", alias = "token")]
     pub token: String,
 
+    #[serde(default)]
     pub port: u16,
 
+    #[serde(default)]
     pub protocol: ProtocolType,
 
-    #[serde(default, skip_serializing_if = "is_default")]
+    #[serde(
+        default,
+        rename = "download",
+        alias = "hasWebInterface",
+        skip_serializing_if = "is_default"
+    )]
     pub has_web_interface: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Serialize, PartialEq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProtocolType {
+    #[serde(rename = "http", alias = "HTTP")]
     Http,
+    #[serde(rename = "https", alias = "HTTPS")]
     Https,
+}
+
+impl Default for ProtocolType {
+    fn default() -> Self {
+        Self::Http
+    }
 }
 
 impl ProtocolType {
@@ -74,9 +90,15 @@ pub struct RegisterResponseDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device_type: Option<DeviceType>,
 
+    #[serde(rename = "fingerprint", alias = "token")]
     pub token: String,
 
-    #[serde(default, skip_serializing_if = "is_default")]
+    #[serde(
+        default,
+        rename = "download",
+        alias = "hasWebInterface",
+        skip_serializing_if = "is_default"
+    )]
     pub has_web_interface: bool,
 }
 

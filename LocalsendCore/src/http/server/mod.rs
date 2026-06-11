@@ -19,9 +19,10 @@ use lru::LruCache;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::fmt::Debug;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::num::NonZeroUsize;
 use std::ops::Deref;
+use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
@@ -63,32 +64,66 @@ pub async fn start_with_port(
     legacy_enabled: bool,
     stop_rx: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
-    let ipv4_socket_addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
-    let ipv6_socket_addr = SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port);
-    let info = Arc::new(Mutex::new(info));
-    let state = AppState::new(info.clone());
-
-    tokio::spawn({
-        let state = state.clone();
-        async move {
-            tokio::select! {
-                _ = start_server_with_addr(ipv4_socket_addr, tls_config.clone(), state.clone(), legacy_enabled) => {
-                    tracing::info!("Server stopped on: {}", ipv4_socket_addr);
-                }
-                _ = async {
-                    if start_server_with_addr(ipv6_socket_addr, tls_config, state, legacy_enabled).await.is_err() {
-                        tracing::warn!("Failed to start server on: {}", ipv6_socket_addr);
-
-                        // Keep the future running forever, so we continue using "ipv4 only" even if ipv6 fails.
-                        tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
-                    }
-                } => {}
-                _ = stop_rx => {}
-            }
+    tokio::spawn(async move {
+        if let Err(err) = run_with_port(port, tls_config, info, legacy_enabled, stop_rx).await {
+            tracing::error!("Server failed: {err:#}");
         }
     });
 
     Ok(())
+}
+
+/// Runs the server until it fails or receives a stop signal.
+pub async fn run_with_port(
+    port: u16,
+    tls_config: Option<TlsConfig>,
+    info: ClientInfo,
+    legacy_enabled: bool,
+    stop_rx: oneshot::Receiver<()>,
+) -> anyhow::Result<()> {
+    run_with_port_inner(port, tls_config, info, legacy_enabled, stop_rx, None).await
+}
+
+pub async fn run_with_port_and_ready(
+    port: u16,
+    tls_config: Option<TlsConfig>,
+    info: ClientInfo,
+    legacy_enabled: bool,
+    stop_rx: oneshot::Receiver<()>,
+    ready_tx: SyncSender<Result<(), String>>,
+) -> anyhow::Result<()> {
+    run_with_port_inner(
+        port,
+        tls_config,
+        info,
+        legacy_enabled,
+        stop_rx,
+        Some(ready_tx),
+    )
+    .await
+}
+
+async fn run_with_port_inner(
+    port: u16,
+    tls_config: Option<TlsConfig>,
+    info: ClientInfo,
+    legacy_enabled: bool,
+    stop_rx: oneshot::Receiver<()>,
+    ready_tx: Option<SyncSender<Result<(), String>>>,
+) -> anyhow::Result<()> {
+    let ipv4_socket_addr = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
+    let info = Arc::new(Mutex::new(info));
+    let state = AppState::new(info.clone());
+
+    tokio::select! {
+        result = start_server_with_addr(ipv4_socket_addr, tls_config, state, legacy_enabled, ready_tx) => {
+            result
+        }
+        _ = stop_rx => {
+            tracing::info!("Server stopped on port {port}");
+            Ok(())
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -102,10 +137,24 @@ async fn start_server_with_addr(
     tls_config: Option<TlsConfig>,
     app_state: AppState,
     legacy_enabled: bool,
+    ready_tx: Option<SyncSender<Result<(), String>>>,
 ) -> anyhow::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    let incoming = tokio::net::TcpListener::bind(socket_addr).await?;
+    let incoming = match tokio::net::TcpListener::bind(socket_addr).await {
+        Ok(listener) => {
+            if let Some(ready_tx) = ready_tx {
+                let _ = ready_tx.send(Ok(()));
+            }
+            listener
+        }
+        Err(error) => {
+            if let Some(ready_tx) = ready_tx {
+                let _ = ready_tx.send(Err(error.to_string()));
+            }
+            return Err(error.into());
+        }
+    };
 
     let tls_acceptor = match tls_config {
         Some(tls_config) => Some(create_tls_config(&tls_config).inspect_err(|err| {
@@ -270,21 +319,20 @@ async fn handle_request_inner(
                 return Err(AppError::Status(StatusCode::NOT_FOUND));
             }
 
-            Ok(
-                controller::v2::register(req.into_body(), state, client_info)
-                    .await?
-                    .into_response(),
-            )
+            Ok(crate::receive::prepare_upload(req.into_body(), client_info.ip).await)
         }
         (&Method::POST, "/api/localsend/v2/upload") => {
             if !legacy_enabled {
                 return Err(AppError::Status(StatusCode::NOT_FOUND));
             }
 
+            let query = query_parameters(req.uri().query());
+            let session_id = query.get("sessionId").map(String::as_str).unwrap_or("");
+            let file_id = query.get("fileId").map(String::as_str).unwrap_or("");
+            let token = query.get("token").map(String::as_str).unwrap_or("");
             Ok(
-                controller::v2::register(req.into_body(), state, client_info)
-                    .await?
-                    .into_response(),
+                crate::receive::upload(req.into_body(), client_info.ip, session_id, file_id, token)
+                    .await,
             )
         }
         (&Method::POST, "/api/localsend/v2/cancel") => {
@@ -292,11 +340,11 @@ async fn handle_request_inner(
                 return Err(AppError::Status(StatusCode::NOT_FOUND));
             }
 
-            Ok(
-                controller::v2::register(req.into_body(), state, client_info)
-                    .await?
-                    .into_response(),
-            )
+            let query = query_parameters(req.uri().query());
+            Ok(crate::receive::cancel(
+                client_info.ip,
+                query.get("sessionId").map(String::as_str),
+            ))
         }
         (&Method::POST, "/api/localsend/v3/nonce") => {
             Ok(
@@ -318,4 +366,13 @@ async fn handle_request_inner(
             Ok(res)
         }
     }
+}
+
+fn query_parameters(query: Option<&str>) -> std::collections::HashMap<String, String> {
+    query
+        .unwrap_or_default()
+        .split('&')
+        .filter_map(|part| part.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect()
 }

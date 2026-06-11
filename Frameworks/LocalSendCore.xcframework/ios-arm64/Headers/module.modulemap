@@ -1,0 +1,4 @@
+module LocalSendCore {
+    header "LocalSendCore.h"
+    export *
+}

@@ -55,6 +55,7 @@ pub(crate) async fn register(
     client_info: RequestClientInfo,
 ) -> Result<JsonResponse<RegisterResponseDto>, AppError> {
     let payload = body.collect_to_json::<RegisterDto>().await?;
+    crate::discovery::record_register(&payload, client_info.ip);
 
     let info = state.info.lock().await.clone();
     let has_web_interface = state.web.lock().await.is_some();
