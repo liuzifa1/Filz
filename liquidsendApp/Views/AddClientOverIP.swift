@@ -1,20 +1,21 @@
-import SwiftData
 import SwiftUI
 
 struct AddClientOverIP: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(CoreStatus.self) private var coreStatus
-    @Query private var settingsList: [SettingsModel]
+
+    var showsCancelButton = false
+    let completion: (LocalSendDevice) -> Void
 
     @State private var alias = ""
     @State private var address = ""
     @State private var port = "53317"
-    @State private var transferProtocol = "http"
+    @State private var transferProtocol = "https"
+    @State private var pin = ""
     @State private var validationError: String?
 
     var body: some View {
         Form {
-            Section("Device") {
+            Section("Destination") {
                 TextField("Name (optional)", text: $alias)
                 TextField("IP address or hostname", text: $address)
                     .textInputAutocapitalization(.never)
@@ -22,10 +23,12 @@ struct AddClientOverIP: View {
                 TextField("Port", text: $port)
                     .keyboardType(.numberPad)
                 Picker("Protocol", selection: $transferProtocol) {
-                    Text("HTTP").tag("http")
                     Text("HTTPS").tag("https")
+                    Text("HTTP").tag("http")
                 }
                 .pickerStyle(.segmented)
+                TextField("PIN, if required", text: $pin)
+                    .textContentType(.oneTimeCode)
             }
 
             if let validationError {
@@ -34,23 +37,22 @@ struct AddClientOverIP: View {
                         .foregroundStyle(.red)
                 }
             }
-
-            Section {
-                Button("Send Selected Items", systemImage: "paperplane.fill") {
-                    send()
-                }
-                .disabled(coreStatus.selectedFileURLs.isEmpty || coreStatus.isSending)
-            } footer: {
-                if coreStatus.selectedFileURLs.isEmpty {
-                    Text("Choose files before opening manual sending.")
+        }
+        .navigationTitle("Add by IP Address")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsCancelButton {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
             }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Add") { addDestination() }
+            }
         }
-        .navigationTitle("Manual Sending")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func send() {
+    private func addDestination() {
         let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedAddress.isEmpty else {
             validationError = "Enter an IP address or hostname."
@@ -60,45 +62,28 @@ struct AddClientOverIP: View {
             validationError = "Enter a valid port between 1 and 65535."
             return
         }
-        guard let settings = settingsList.first else {
-            validationError = "App settings are unavailable."
-            return
-        }
 
-        validationError = nil
+        let trimmedAlias = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPIN = pin.trimmingCharacters(in: .whitespacesAndNewlines)
         let device = LocalSendDevice(
-            alias: alias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? trimmedAddress
-                : alias.trimmingCharacters(in: .whitespacesAndNewlines),
+            alias: trimmedAlias.isEmpty ? trimmedAddress : trimmedAlias,
             version: "2.1",
             deviceModel: nil,
             deviceType: "desktop",
-            token: "manual:\(trimmedAddress):\(targetPort)",
+            token: "manual:\(trimmedAddress):\(targetPort):\(transferProtocol)",
             ip: trimmedAddress,
             port: targetPort,
             protocol: transferProtocol,
-            download: false
+            download: false,
+            pin: normalizedPIN.isEmpty ? nil : normalizedPIN
         )
-        Task {
-            await coreStatus.sendSelectedFile(
-                to: device,
-                alias: settings.userName,
-                portText: settings.port,
-                deviceModel: settings.deviceModel,
-                deviceIcon: settings.selectedDeviceIcon,
-                saveToHistory: settings.saveToHistory
-            )
-            if coreStatus.transferError == nil {
-                dismiss()
-            }
-        }
+        completion(device)
+        dismiss()
     }
 }
 
 #Preview {
     NavigationStack {
-        AddClientOverIP()
+        AddClientOverIP(showsCancelButton: true) { _ in }
     }
-    .modelContainer(for: SettingsModel.self, inMemory: true)
-    .environment(CoreStatus())
 }

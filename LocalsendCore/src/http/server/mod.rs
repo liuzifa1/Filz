@@ -26,6 +26,16 @@ use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyInfoResponse {
+    alias: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device_model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device_type: Option<crate::model::discovery::DeviceType>,
+}
+
 #[derive(Clone)]
 struct AppState {
     /// Information about server's device.
@@ -276,6 +286,15 @@ impl RequestClientInfo {
         self.extract_public_key()
             .unwrap_or_else(|| self.ip.to_string())
     }
+
+    fn fingerprint(&self) -> Option<String> {
+        self.cert.as_ref().map(|cert| {
+            crate::crypto::hash::sha256(cert)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect()
+        })
+    }
 }
 
 async fn handle_request(
@@ -303,6 +322,68 @@ async fn handle_request_inner(
     };
 
     match (req.method(), req.uri().path()) {
+        (&Method::GET, "/api/localsend/v1/info") => {
+            if !legacy_enabled {
+                return Err(AppError::Status(StatusCode::NOT_FOUND));
+            }
+            let info = state.info.lock().await.clone();
+            Ok(json_response(
+                StatusCode::OK,
+                &LegacyInfoResponse {
+                    alias: info.alias,
+                    device_model: info.device_model,
+                    device_type: info.device_type,
+                },
+            ))
+        }
+        (&Method::POST, "/api/localsend/v1/send-request") => {
+            if !legacy_enabled {
+                return Err(AppError::Status(StatusCode::NOT_FOUND));
+            }
+            let query = query_parameters(req.uri().query());
+            Ok(crate::receive::prepare_upload_v1(
+                req.into_body(),
+                client_info.ip,
+                query.get("pin").map(String::as_str),
+                client_info
+                    .fingerprint()
+                    .unwrap_or_else(|| client_info.identifier()),
+            )
+            .await)
+        }
+        (&Method::POST, "/api/localsend/v1/send") => {
+            if !legacy_enabled {
+                return Err(AppError::Status(StatusCode::NOT_FOUND));
+            }
+            let query = query_parameters(req.uri().query());
+            let file_id = query.get("fileId").map(String::as_str).unwrap_or("");
+            let token = query.get("token").map(String::as_str).unwrap_or("");
+            Ok(crate::receive::upload_v1(req.into_body(), client_info.ip, file_id, token).await)
+        }
+        (&Method::POST, "/api/localsend/v1/cancel") => {
+            if !legacy_enabled {
+                return Err(AppError::Status(StatusCode::NOT_FOUND));
+            }
+            Ok(crate::receive::cancel(client_info.ip, None))
+        }
+        (&Method::GET, "/api/localsend/v2/info") => {
+            if !legacy_enabled {
+                return Err(AppError::Status(StatusCode::NOT_FOUND));
+            }
+            let info = state.info.lock().await.clone();
+            let has_web_interface = state.web.lock().await.is_some();
+            Ok(json_response(
+                StatusCode::OK,
+                &crate::http::dto::RegisterResponseDto {
+                    alias: info.alias,
+                    version: info.version,
+                    device_model: info.device_model,
+                    device_type: info.device_type,
+                    token: info.token,
+                    has_web_interface,
+                },
+            ))
+        }
         (&Method::POST, "/api/localsend/v2/register") => {
             if !legacy_enabled {
                 return Err(AppError::Status(StatusCode::NOT_FOUND));
@@ -319,7 +400,14 @@ async fn handle_request_inner(
                 return Err(AppError::Status(StatusCode::NOT_FOUND));
             }
 
-            Ok(crate::receive::prepare_upload(req.into_body(), client_info.ip).await)
+            let query = query_parameters(req.uri().query());
+            Ok(crate::receive::prepare_upload(
+                req.into_body(),
+                client_info.ip,
+                query.get("pin").map(String::as_str),
+                client_info.fingerprint(),
+            )
+            .await)
         }
         (&Method::POST, "/api/localsend/v2/upload") => {
             if !legacy_enabled {
@@ -366,6 +454,15 @@ async fn handle_request_inner(
             Ok(res)
         }
     }
+}
+
+fn json_response<T: serde::Serialize>(status: StatusCode, value: &T) -> Response<Full<Bytes>> {
+    let body = serde_json::to_vec(value).unwrap_or_default();
+    Response::builder()
+        .status(status)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .body(Full::from(Bytes::from(body)))
+        .unwrap()
 }
 
 fn query_parameters(query: Option<&str>) -> std::collections::HashMap<String, String> {

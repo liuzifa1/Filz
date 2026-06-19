@@ -6,6 +6,7 @@
 //
 import SwiftUI
 import SwiftData
+import UIKit
 
 // Main body for Settings view
 struct SettingsView: View {
@@ -33,6 +34,11 @@ struct SettingsView: View {
 // Form View for Settings
 struct SettingsFormView: View {
     @Environment(CoreStatus.self) private var coreStatus
+    @Environment(\.modelContext) private var modelContext
+    @Query private var historyEntries: [TransferHistoryEntry]
+    @State private var identityName = ""
+    @State private var showIdentityEditor = false
+    @State private var showHistoryDeleteConfirmation = false
     
     @Bindable var settings: SettingsModel // Import from SwiftData, and make it bindable
     var dismiss: DismissAction // Import dismiss function
@@ -41,57 +47,40 @@ struct SettingsFormView: View {
     var body: some View {
         Form {
             Section {
-            // Profile Stack
-                HStack(alignment: .top) {
-                    /// Avatar Image
-                    Image("avatarFr")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 90)
-                    /// All the text
-                    VStack(alignment: .leading) {
-                        /// HStack for name
-                        HStack {
-                            TextField("Enter your name", text: $settings.userName)
-                                .font(.system(size: 23, weight: .bold, design: .default))
-                                .underline(true, color: .gray)
-                            Image(systemName: "pencil.line")
-                                .foregroundStyle(.secondary)
-                                .scaleEffect(1.5)
-                                .offset(x: -10, y: 3)
-                        }
-                        /// HStack for server status
-                        HStack {
-                            if coreStatus.isCoreRunning {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("Server running")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
-                                Text("Server stopped")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        /// HStack for network status
-                        HStack {
-                            Image(systemName: "network")
-                            Text(coreStatus.activePort.map { "Listening on port \($0)" } ?? "Not listening")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .offset(y: 5)
+                LabeledContent("Device Name", value: settings.userName)
+                Button("Change Device Name", systemImage: "person.crop.circle.badge.pencil") {
+                    identityName = settings.userName
+                    showIdentityEditor = true
                 }
+            } header: {
+                Text("Identity")
             }
             // Receive Section
             Section(header: Text("Receive")) {
                 Toggle("Quick Save", isOn: $settings.quickSave)
                 Toggle("Quick Save for Favourites", isOn: $settings.quickSaveFavourites)
                 Toggle("Require PIN", isOn: $settings.requirePIN)
+                if settings.requirePIN {
+                    TextField("Receive PIN", text: $settings.receivePIN)
+                        .textContentType(.oneTimeCode)
+                        .keyboardType(.numberPad)
+                }
                 Toggle("Save media to gallery", isOn: $settings.saveMediaToGallery)
                 Toggle("Auto Finish", isOn: $settings.autoFinish)
                 Toggle("Save to history", isOn: $settings.saveToHistory)
+                Button("Delete History", systemImage: "trash", role: .destructive) {
+                    showHistoryDeleteConfirmation = true
+                }
+                .disabled(historyEntries.isEmpty)
+            }
+            Section {
+                NavigationLink {
+                    FavouriteDevicesView(settings: settings, devices: coreStatus.nearbyDevices)
+                } label: {
+                    LabeledContent("Saved Devices", value: "\(settings.favouriteDeviceTokens.count)")
+                }
+            } header: {
+                Text("Favourites")
             }
             // Network Section
             Section(header: Text("Network")) {
@@ -169,13 +158,15 @@ struct SettingsFormView: View {
                     Text("0.1_alpha")
                         .foregroundStyle(.secondary)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 3, perform: toggleAppIcon)
                 HStack {
                     Text("Localsend Core")
                         Spacer()
                     Text(coreStatus.coreVersion)
                         .foregroundStyle(.secondary)
                 }
-                NavigationLink("About LocalSend") {
+                NavigationLink("About Filz!") {
                     AboutAppView()
                 }
             }
@@ -190,7 +181,38 @@ struct SettingsFormView: View {
         .navigationTitle("Settings")
         .toolbarTitleDisplayMode(.inline)
         .onAppear {
+            identityName = settings.userName
             coreStatus.refresh()
+            if settings.requirePIN && settings.receivePIN.isEmpty {
+                settings.receivePIN = String(Int.random(in: 100_000...999_999))
+            }
+            applyReceivePIN()
+        }
+        .onChange(of: settings.requirePIN) { _, enabled in
+            if enabled && settings.receivePIN.isEmpty {
+                settings.receivePIN = String(Int.random(in: 100_000...999_999))
+            }
+            applyReceivePIN()
+        }
+        .onChange(of: settings.receivePIN) { _, _ in applyReceivePIN() }
+        .alert("Change Device Name", isPresented: $showIdentityEditor) {
+            TextField("Device Name", text: $identityName)
+                .textInputAutocapitalization(.words)
+            Button("Cancel", role: .cancel) {}
+            Button("Apply", action: applyIdentity)
+                .disabled(identityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text(coreStatus.isCoreRunning ? "Applying this restarts the LocalSend server so nearby devices see the new name." : "This name is advertised to nearby LocalSend devices when the server starts.")
+        }
+        .confirmationDialog(
+            "Delete all transfer history?",
+            isPresented: $showHistoryDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete History", role: .destructive) {
+                historyEntries.forEach(modelContext.delete)
+                try? modelContext.save()
+            }
         }
     }
 
@@ -199,8 +221,22 @@ struct SettingsFormView: View {
             alias: settings.userName,
             portText: settings.port,
             deviceModel: settings.deviceModel,
-            deviceIcon: settings.selectedDeviceIcon
+            deviceIcon: settings.selectedDeviceIcon,
+            receivePIN: settings.requirePIN ? settings.receivePIN : nil
         )
+    }
+
+    private func applyIdentity() {
+        let normalizedName = identityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty else { return }
+        identityName = normalizedName
+        settings.userName = normalizedName
+        if coreStatus.isCoreRunning {
+            restartServer()
+        } else {
+            startServer()
+        }
+        showIdentityEditor = false
     }
 
     private func restartServer() {
@@ -208,8 +244,68 @@ struct SettingsFormView: View {
             alias: settings.userName,
             portText: settings.port,
             deviceModel: settings.deviceModel,
-            deviceIcon: settings.selectedDeviceIcon
+            deviceIcon: settings.selectedDeviceIcon,
+            receivePIN: settings.requirePIN ? settings.receivePIN : nil
         )
+    }
+
+    private func applyReceivePIN() {
+        coreStatus.configureReceivePIN(settings.requirePIN ? settings.receivePIN : nil)
+    }
+
+    private func toggleAppIcon() {
+        guard UIApplication.shared.supportsAlternateIcons else { return }
+        let nextIcon = UIApplication.shared.alternateIconName == "catz" ? nil : "catz"
+        UIApplication.shared.setAlternateIconName(nextIcon)
+    }
+}
+private struct FavouriteDevicesView: View {
+    @Bindable var settings: SettingsModel
+    let devices: [LocalSendDevice]
+
+    var body: some View {
+        List {
+            if settings.favouriteDeviceTokens.isEmpty {
+                ContentUnavailableView("No Favourites", systemImage: "star")
+            } else {
+                ForEach(settings.favouriteDeviceTokens, id: \.self) { fingerprint in
+                    let device = devices.first { $0.id == fingerprint || $0.token == fingerprint }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label(device?.alias ?? "Saved Device", systemImage: device?.systemImage ?? "desktopcomputer")
+                            Spacer()
+                            if let protocolName = device?.protocol {
+                                Text(protocolName.uppercased())
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let device {
+                            Text(device.endpoint)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(fingerprint)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    .swipeActions {
+                        Button("Remove", systemImage: "star.slash", role: .destructive) {
+                            settings.favouriteDeviceTokens.removeAll { $0 == fingerprint }
+                        }
+                    }
+                }
+
+                Section {
+                    Button("Clear Favourites", systemImage: "star.slash", role: .destructive) {
+                        settings.favouriteDeviceTokens.removeAll()
+                    }
+                }
+            }
+        }
+        .navigationTitle("Favourites")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -10,15 +10,20 @@ void localsendcore_string_free(char *pointer);
 char *localsendcore_discovered_devices_json(void);
 void localsendcore_refresh_discovery(void);
 int32_t localsendcore_set_receive_directory(const char *path);
+int32_t localsendcore_set_receive_pin(const char *pin);
+int32_t localsendcore_configure_tls_identity(const char *directory, const char *common_name);
 char *localsendcore_pending_receive_json(void);
 char *localsendcore_receive_progress_json(void);
 char *localsendcore_send_progress_json(void);
 int32_t localsendcore_decide_receive(const char *request_id, bool accepted);
+void localsendcore_cancel_send(void);
+void localsendcore_cancel_receive(void);
 int32_t localsendcore_send_files_json(
     const char *target_ip,
     uint16_t target_port,
     const char *target_protocol,
     const char *target_alias,
+    const char *target_pin,
     const char *sender_alias,
     uint16_t sender_port,
     const char *sender_device_model,

@@ -18,6 +18,31 @@ struct LocalSendDevice: Decodable, Identifiable, Hashable, Sendable {
     let port: UInt16
     let `protocol`: String
     let download: Bool
+    let pin: String?
+
+    init(
+        alias: String,
+        version: String,
+        deviceModel: String?,
+        deviceType: String,
+        token: String,
+        ip: String,
+        port: UInt16,
+        protocol: String,
+        download: Bool,
+        pin: String? = nil
+    ) {
+        self.alias = alias
+        self.version = version
+        self.deviceModel = deviceModel
+        self.deviceType = deviceType
+        self.token = token
+        self.ip = ip
+        self.port = port
+        self.protocol = `protocol`
+        self.download = download
+        self.pin = pin
+    }
 
     var id: String {
         token.isEmpty ? "\(ip):\(port)" : token
@@ -57,14 +82,39 @@ struct IncomingLocalSendRequest: Decodable, Identifiable, Hashable {
     let id: String
     let senderAlias: String
     let senderIP: String
+    let senderPort: UInt16
+    let senderProtocol: String
+    let senderToken: String
+    let senderFingerprint: String?
     let files: [IncomingLocalSendFile]
     let totalBytes: UInt64
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case senderAlias
+        case senderIP = "senderIp"
+        case senderPort
+        case senderProtocol
+        case senderToken
+        case senderFingerprint
+        case files
+        case totalBytes
+    }
 }
 
 struct LocalSendTransferProgress: Decodable, Equatable {
+    let requestID: String?
     let status: String
+    let startedAtMillis: UInt64?
     let targetAlias: String?
+    let targetIP: String?
+    let targetPort: UInt16?
+    let targetProtocol: String?
     let senderAlias: String?
+    let senderIP: String?
+    let senderPort: UInt16?
+    let senderProtocol: String?
+    let senderFingerprint: String?
     let currentFile: String?
     let sentBytes: UInt64?
     let receivedBytes: UInt64?
@@ -74,6 +124,29 @@ struct LocalSendTransferProgress: Decodable, Equatable {
     let savedPaths: [String]?
     let error: String?
 
+    enum CodingKeys: String, CodingKey {
+        case requestID = "requestId"
+        case status
+        case startedAtMillis
+        case targetAlias
+        case targetIP = "targetIp"
+        case targetPort
+        case targetProtocol
+        case senderAlias
+        case senderIP = "senderIp"
+        case senderPort
+        case senderProtocol
+        case senderFingerprint
+        case currentFile
+        case sentBytes
+        case receivedBytes
+        case totalBytes
+        case completedFiles
+        case totalFiles
+        case savedPaths
+        case error
+    }
+
     var transferredBytes: UInt64 {
         sentBytes ?? receivedBytes ?? 0
     }
@@ -81,5 +154,35 @@ struct LocalSendTransferProgress: Decodable, Equatable {
     var fractionCompleted: Double {
         guard totalBytes > 0 else { return status == "finished" ? 1 : 0 }
         return min(Double(transferredBytes) / Double(totalBytes), 1)
+    }
+
+    var percentText: String {
+        "\(Int((fractionCompleted * 100).rounded()))%"
+    }
+
+    var elapsedSeconds: TimeInterval? {
+        guard let startedAtMillis else { return nil }
+        return max(Date().timeIntervalSince1970 - (Double(startedAtMillis) / 1000), 0)
+    }
+
+    var bytesPerSecond: Double? {
+        guard let elapsedSeconds, elapsedSeconds > 0.2 else { return nil }
+        let bytes = status == "finished" ? totalBytes : transferredBytes
+        return Double(bytes) / elapsedSeconds
+    }
+
+    var averageBytesPerSecond: Double? {
+        guard status == "finished" else { return nil }
+        return bytesPerSecond
+    }
+
+    var estimatedRemainingSeconds: TimeInterval? {
+        guard ["sending", "receiving"].contains(status),
+              let bytesPerSecond,
+              bytesPerSecond > 0,
+              totalBytes > transferredBytes else {
+            return nil
+        }
+        return Double(totalBytes - transferredBytes) / bytesPerSecond
     }
 }

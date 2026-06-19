@@ -14,18 +14,22 @@ struct SendView: View {
     @Environment(CoreStatus.self) private var coreStatus
     @Query private var settingsList: [SettingsModel]
     let selectDevice: (LocalSendDevice) -> Void
+    let selectMultiple: () -> Void
+    let sendToIP: () -> Void
 
-    // MARK: Body
+    // Body
     var body: some View {
         List {
+            // core status & ip detail for send view, at top of the screen
             Section {
+                // localsend core status
                 HStack(spacing: 8) {
                     Image(systemName: coreStatus.isCoreRunning ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .foregroundStyle(coreStatus.isCoreRunning ? .green : .red)
                         .frame(width: 24, alignment: .center)
                     VStack(alignment: .leading) {
                         Text("Localsend Core")
-                        Text(coreStatus.isCoreRunning ? "Server running on port \(coreStatus.activePort ?? 53317)" : "Server stopped")
+                        Text(coreStatus.isCoreRunning ? "HTTPS server on port \(coreStatus.activePort ?? 53317)" : "Server stopped")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -38,7 +42,8 @@ struct SendView: View {
                                 alias: settings.userName,
                                 portText: settings.port,
                                 deviceModel: settings.deviceModel,
-                                deviceIcon: settings.selectedDeviceIcon
+                                deviceIcon: settings.selectedDeviceIcon,
+                                receivePIN: settings.requirePIN ? settings.receivePIN : nil
                             )
                         }
                     } label: {
@@ -47,62 +52,32 @@ struct SendView: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel(coreStatus.isCoreRunning ? "Refresh devices" : "Start server")
                 }
-                if !coreStatus.isCoreRunning, let error = coreStatus.lastError, !error.isEmpty {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                if coreStatus.isCoreRunning {
-                    Text(addressSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    if let pin = coreStatus.receivePIN {
-                        Text("PIN \(pin)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                // Error or IP
+                HStack {
+                    if let error = coreStatus.lastError, !error.isEmpty {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(coreStatus.isCoreRunning ? .orange : .red)
+                            .frame(width: 24, alignment: .center)
                     }
-                }
-            }
-            if let request = coreStatus.pendingReceiveRequest {
-                Section("Incoming Transfer") {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(request.senderAlias)
-                                .font(.headline)
-                            Text("\(request.files.count) item(s), \(ByteCountFormatter.string(fromByteCount: Int64(request.totalBytes), countStyle: .file))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundStyle(.green)
+                    else {
+                        Label("Network iPs",systemImage: "network")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                            .labelStyle(.iconOnly)
                     }
-                    ForEach(request.files.prefix(4)) { file in
-                        HStack {
-                            Text(file.fileName)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if request.files.count > 4 {
-                        Text("and \(request.files.count - 4) more")
+                    if coreStatus.isCoreRunning {
+                        Text(addressSummary)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
-                    HStack {
-                        Button("Decline", role: .destructive) {
-                            coreStatus.decideReceive(accepted: false)
-                        }
-                        Spacer()
-                        Button("Accept", systemImage: "checkmark") {
-                            coreStatus.decideReceive(accepted: true)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
+                }
+                // Pins if any
+                if let pin = coreStatus.receivePIN {
+                    Text("PIN \(pin)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
             }
             if !coreStatus.selectedFileURLs.isEmpty {
@@ -146,11 +121,13 @@ struct SendView: View {
                        progress.status == "sending" || progress.status == "waiting" {
                         VStack(alignment: .leading, spacing: 6) {
                             ProgressView(value: progress.fractionCompleted)
+                                .animation(.linear(duration: 0.25), value: progress.fractionCompleted)
                             HStack {
                                 Text(progress.currentFile ?? "Waiting for recipient")
                                     .lineLimit(1)
                                 Spacer()
-                                Text("\(Int(progress.fractionCompleted * 100))%")
+                                Text(progress.percentText)
+                                    .monospacedDigit()
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -169,38 +146,7 @@ struct SendView: View {
                     }
                 }
             }
-            if let progress = coreStatus.receiveProgress,
-               ["receiving", "finished", "failed"].contains(progress.status) {
-                Section("Received Files") {
-                    ProgressView(value: progress.fractionCompleted)
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(progress.status == "finished" ? "Transfer complete" : "From \(progress.senderAlias ?? "LocalSend device")")
-                            Text("\(progress.completedFiles) of \(progress.totalFiles) item(s)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("\(Int(progress.fractionCompleted * 100))%")
-                            .foregroundStyle(.secondary)
-                    }
-                    if let currentFile = progress.currentFile {
-                        Text(currentFile)
-                            .font(.caption)
-                            .lineLimit(1)
-                    }
-                    if progress.status == "finished" {
-                        Label("Saved in Files > On My iPhone > LiquidSend > Received Files", systemImage: "folder.fill")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if let error = progress.error {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
+            receivingSection
             // MARK: Nearby Devices
             Section("Nearby Devices") {
                 if coreStatus.nearbyDevices.isEmpty {
@@ -217,14 +163,14 @@ struct SendView: View {
                         }
                     }
                 } else {
-                    ForEach(coreStatus.nearbyDevices) { device in
+                    ForEach(sortedNearbyDevices) { device in
                         Button {
                             selectDevice(device)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: device.systemImage)
                                     .font(.title3)
-                                    .foregroundStyle(.tint)
+                                    .foregroundStyle(isFavourite(device) ? .yellow : .accentColor)
                                     .frame(width: 32)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(device.alias)
@@ -241,18 +187,35 @@ struct SendView: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(coreStatus.isSending)
+                        .swipeActions(edge: .leading) {
+                            if let settings = settingsList.first, !settings.isFavourite(device) {
+                                Button("Favourite", systemImage: "star.fill") {
+                                    settings.toggleFavourite(device)
+                                }
+                                .tint(.yellow)
+                            }
+                        }
+                        .swipeActions {
+                            if let settings = settingsList.first, settings.isFavourite(device) {
+                                Button("Remove", systemImage: "star.slash", role: .destructive) {
+                                    settings.toggleFavourite(device)
+                                }
+                            }
+                        }
                     }
                 }
             }
             // MARK: Send to IPs
             Section {
-                NavigationLink {
-                    AddClientOverIP()
-                } label: {
+                Button(action: sendToIP) {
                     Label("Send to IP Address", systemImage: "network")
+                }
+                Button(action: selectMultiple) {
+                    Label("Choose Multiple Destinations", systemImage: "person.2.badge.plus")
                 }
             }
         }
@@ -271,9 +234,172 @@ struct SendView: View {
         let port = coreStatus.activePort ?? UInt16(settingsList.first?.port ?? "") ?? 53317
         return coreStatus.localIPv4Addresses.map { "\($0):\(port)" }.joined(separator: "  ")
     }
+
+    private var sortedNearbyDevices: [LocalSendDevice] {
+        guard let settings = settingsList.first else { return coreStatus.nearbyDevices }
+        return coreStatus.nearbyDevices.sorted { left, right in
+            let leftFavourite = settings.isFavourite(left)
+            let rightFavourite = settings.isFavourite(right)
+            if leftFavourite != rightFavourite { return leftFavourite }
+            return left.alias.localizedCaseInsensitiveCompare(right.alias) == .orderedAscending
+        }
+    }
+
+    private func isFavourite(_ device: LocalSendDevice) -> Bool {
+        settingsList.first?.isFavourite(device) ?? false
+    }
+
+    @ViewBuilder
+    private var receivingSection: some View {
+        if let request = coreStatus.pendingReceiveRequest {
+            Section("Receiving") {
+                NavigationLink {
+                    IncomingReceiveRequestDetailView(request: request) { accepted in
+                        coreStatus.decideReceive(accepted: accepted)
+                    }
+                } label: {
+                    ReceiveProgressRow(
+                        title: request.senderAlias,
+                        status: "Waiting for approval",
+                        detail: "\(request.files.count) item(s), \(ByteCountFormatter.string(fromByteCount: Int64(request.totalBytes), countStyle: .file))",
+                        fraction: coreStatus.receiveProgress?.fractionCompleted ?? 0,
+                        percent: coreStatus.receiveProgress?.percentText ?? "0%",
+                        icon: "hand.raised.circle.fill",
+                        color: .orange
+                    )
+                }
+                .swipeActions(edge: .leading) {
+                    Button("Accept", systemImage: "checkmark") {
+                        coreStatus.decideReceive(accepted: true)
+                    }
+                    .tint(.green)
+                }
+                .swipeActions {
+                    Button("Decline", systemImage: "xmark", role: .destructive) {
+                        coreStatus.decideReceive(accepted: false)
+                    }
+                }
+            }
+        } else if let progress = coreStatus.receiveProgress,
+                  ["waiting", "approved", "receiving", "finished", "failed"].contains(progress.status) {
+            Section("Receiving") {
+                NavigationLink {
+                    TransferProgressDetailView(direction: .received, progress: progress)
+                } label: {
+                    ReceiveProgressRow(
+                        title: progress.senderAlias ?? "LocalSend device",
+                        status: receiveStatusText(progress),
+                        detail: progress.currentFile ?? "\(progress.completedFiles) of \(progress.totalFiles) item(s)",
+                        fraction: progress.fractionCompleted,
+                        percent: progress.percentText,
+                        icon: receiveStatusIcon(progress),
+                        color: receiveStatusColor(progress)
+                    )
+                }
+                .swipeActions(edge: .leading) {
+                    if progress.status == "waiting", let requestID = progress.requestID {
+                        Button("Accept", systemImage: "checkmark") {
+                            coreStatus.decideReceive(requestID: requestID, accepted: true)
+                        }
+                        .tint(.green)
+                    }
+                }
+                .swipeActions {
+                    if progress.status == "waiting", let requestID = progress.requestID {
+                        Button("Decline", systemImage: "xmark", role: .destructive) {
+                            coreStatus.decideReceive(requestID: requestID, accepted: false)
+                        }
+                    } else if ["approved", "receiving"].contains(progress.status) {
+                        Button("Cancel", systemImage: "xmark", role: .destructive) {
+                            coreStatus.cancelReceive()
+                        }
+                    }
+                }
+
+                if let error = progress.error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private func receiveStatusText(_ progress: LocalSendTransferProgress) -> String {
+        switch progress.status {
+        case "waiting":
+            return "Waiting for approval"
+        case "approved":
+            return "Accepted; waiting for upload"
+        case "receiving":
+            return "Receiving files"
+        case "finished":
+            return "Transfer complete"
+        case "failed":
+            return "Transfer failed"
+        default:
+            return progress.status.capitalized
+        }
+    }
+
+    private func receiveStatusIcon(_ progress: LocalSendTransferProgress) -> String {
+        switch progress.status {
+        case "waiting": return "hand.raised.circle.fill"
+        case "finished": return "checkmark.circle.fill"
+        case "failed": return "exclamationmark.triangle.fill"
+        default: return "arrow.down.circle.fill"
+        }
+    }
+
+    private func receiveStatusColor(_ progress: LocalSendTransferProgress) -> Color {
+        switch progress.status {
+        case "waiting": return .orange
+        case "failed": return .red
+        default: return .green
+        }
+    }
+}
+
+private struct ReceiveProgressRow: View {
+    let title: String
+    let status: String
+    let detail: String
+    let fraction: Double
+    let percent: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(title).font(.headline)
+                    Spacer()
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(value: fraction)
+                    .animation(.linear(duration: 0.25), value: fraction)
+                HStack {
+                    Text(detail)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(percent)
+                        .monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
 }
 
 #Preview {
-    SendView { _ in }
+    SendView(selectDevice: { _ in }, selectMultiple: {}, sendToIP: {})
         .environment(CoreStatus())
 }

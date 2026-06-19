@@ -1167,6 +1167,7 @@ dependencies = [
  "lru",
  "pem",
  "rand 0.9.1",
+ "rcgen",
  "reqwest",
  "rsa",
  "rustls",

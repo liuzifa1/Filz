@@ -59,21 +59,23 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		845915F02F1A412C00B08687 /* liquidsend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = liquidsend.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		845915FF2F1A412E00B08687 /* liquidsendTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = liquidsendTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		845916092F1A412E00B08687 /* liquidsendUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = liquidsendUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		845915F02F1A412C00B08687 /* Filz!.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Filz!.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		845915FF2F1A412E00B08687 /* Filz!Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Filz!Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		845916092F1A412E00B08687 /* Filz!UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Filz!UITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		84A100012F70000100AE3A80 /* LocalSendCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = LocalSendCore.xcframework; sourceTree = "<group>"; };
 		84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiquidSendTransferWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiquidSendShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		84A100032F70000200AE3A80 /* Exceptions for "liquidsendApp" folder in "liquidsend" target */ = {
+		84A100032F70000200AE3A80 /* Exceptions for "liquidsendApp" folder in "Filz!" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				catz.icon,
+				filz.icon,
 			);
-			target = 845915EF2F1A412C00B08687 /* liquidsend */;
+			target = 845915EF2F1A412C00B08687 /* Filz! */;
 		};
 		84B200042F80000100AE3A80 /* Exceptions for "LiquidSendTransferWidget" folder in "LiquidSendTransferWidget" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -82,21 +84,21 @@
 			);
 			target = 84B2000A2F80000100AE3A80 /* LiquidSendTransferWidget */;
 		};
-		84BC0A7A2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "liquidsendTests" target */ = {
+		84BC0A7A2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "Filz!Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				liquidsendUITests.swift,
 				liquidsendUITestsLaunchTests.swift,
 			);
-			target = 845915FE2F1A412E00B08687 /* liquidsendTests */;
+			target = 845915FE2F1A412E00B08687 /* Filz!Tests */;
 		};
-		84BC0A7B2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "liquidsendUITests" target */ = {
+		84BC0A7B2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "Filz!UITests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				liquidsendUITests.swift,
 				liquidsendUITestsLaunchTests.swift,
 			);
-			target = 845916082F1A412E00B08687 /* liquidsendUITests */;
+			target = 845916082F1A412E00B08687 /* Filz!UITests */;
 		};
 		84C300032F90000100AE3A80 /* Exceptions for "LiquidSendShareExtension" folder in "LiquidSendShareExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -111,7 +113,7 @@
 		845915F22F1A412C00B08687 /* liquidsendApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				84A100032F70000200AE3A80 /* Exceptions for "liquidsendApp" folder in "liquidsend" target */,
+				84A100032F70000200AE3A80 /* Exceptions for "liquidsendApp" folder in "Filz!" target */,
 			);
 			path = liquidsendApp;
 			sourceTree = "<group>";
@@ -119,8 +121,8 @@
 		845916022F1A412E00B08687 /* liquidsendTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				84BC0A7A2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "liquidsendTests" target */,
-				84BC0A7B2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "liquidsendUITests" target */,
+				84BC0A7A2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "Filz!Tests" target */,
+				84BC0A7B2FDAE98C00C0939A /* Exceptions for "liquidsendTests" folder in "Filz!UITests" target */,
 			);
 			path = liquidsendTests;
 			sourceTree = "<group>";
@@ -204,9 +206,9 @@
 		845915F12F1A412C00B08687 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				845915F02F1A412C00B08687 /* liquidsend.app */,
-				845915FF2F1A412E00B08687 /* liquidsendTests.xctest */,
-				845916092F1A412E00B08687 /* liquidsendUITests.xctest */,
+				845915F02F1A412C00B08687 /* Filz!.app */,
+				845915FF2F1A412E00B08687 /* Filz!Tests.xctest */,
+				845916092F1A412E00B08687 /* Filz!UITests.xctest */,
 				84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */,
 				84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */,
 			);
@@ -224,9 +226,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		845915EF2F1A412C00B08687 /* liquidsend */ = {
+		845915EF2F1A412C00B08687 /* Filz! */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 845916132F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsend" */;
+			buildConfigurationList = 845916132F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!" */;
 			buildPhases = (
 				845915EC2F1A412C00B08687 /* Sources */,
 				845915ED2F1A412C00B08687 /* Frameworks */,
@@ -242,16 +244,16 @@
 			fileSystemSynchronizedGroups = (
 				845915F22F1A412C00B08687 /* liquidsendApp */,
 			);
-			name = liquidsend;
+			name = "Filz!";
 			packageProductDependencies = (
 			);
 			productName = liquidsend;
-			productReference = 845915F02F1A412C00B08687 /* liquidsend.app */;
+			productReference = 845915F02F1A412C00B08687 /* Filz!.app */;
 			productType = "com.apple.product-type.application";
 		};
-		845915FE2F1A412E00B08687 /* liquidsendTests */ = {
+		845915FE2F1A412E00B08687 /* Filz!Tests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 845916162F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsendTests" */;
+			buildConfigurationList = 845916162F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!Tests" */;
 			buildPhases = (
 				845915FB2F1A412E00B08687 /* Sources */,
 				845915FC2F1A412E00B08687 /* Frameworks */,
@@ -265,16 +267,16 @@
 			fileSystemSynchronizedGroups = (
 				845916022F1A412E00B08687 /* liquidsendTests */,
 			);
-			name = liquidsendTests;
+			name = "Filz!Tests";
 			packageProductDependencies = (
 			);
 			productName = liquidsendTests;
-			productReference = 845915FF2F1A412E00B08687 /* liquidsendTests.xctest */;
+			productReference = 845915FF2F1A412E00B08687 /* Filz!Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		845916082F1A412E00B08687 /* liquidsendUITests */ = {
+		845916082F1A412E00B08687 /* Filz!UITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 845916192F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsendUITests" */;
+			buildConfigurationList = 845916192F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!UITests" */;
 			buildPhases = (
 				845916052F1A412E00B08687 /* Sources */,
 				845916062F1A412E00B08687 /* Frameworks */,
@@ -285,11 +287,11 @@
 			dependencies = (
 				8459160B2F1A412E00B08687 /* PBXTargetDependency */,
 			);
-			name = liquidsendUITests;
+			name = "Filz!UITests";
 			packageProductDependencies = (
 			);
 			productName = liquidsendUITests;
-			productReference = 845916092F1A412E00B08687 /* liquidsendUITests.xctest */;
+			productReference = 845916092F1A412E00B08687 /* Filz!UITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		84B2000A2F80000100AE3A80 /* LiquidSendTransferWidget */ = {
@@ -365,7 +367,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 845915EB2F1A412C00B08687 /* Build configuration list for PBXProject "liquidsend" */;
+			buildConfigurationList = 845915EB2F1A412C00B08687 /* Build configuration list for PBXProject "Filz!" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -379,9 +381,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				845915EF2F1A412C00B08687 /* liquidsend */,
-				845915FE2F1A412E00B08687 /* liquidsendTests */,
-				845916082F1A412E00B08687 /* liquidsendUITests */,
+				845915EF2F1A412C00B08687 /* Filz! */,
+				845915FE2F1A412E00B08687 /* Filz!Tests */,
+				845916082F1A412E00B08687 /* Filz!UITests */,
 				84B2000A2F80000100AE3A80 /* LiquidSendTransferWidget */,
 				84C300092F90000100AE3A80 /* LiquidSendShareExtension */,
 			);
@@ -467,12 +469,12 @@
 /* Begin PBXTargetDependency section */
 		845916012F1A412E00B08687 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 845915EF2F1A412C00B08687 /* liquidsend */;
+			target = 845915EF2F1A412C00B08687 /* Filz! */;
 			targetProxy = 845916002F1A412E00B08687 /* PBXContainerItemProxy */;
 		};
 		8459160B2F1A412E00B08687 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 845915EF2F1A412C00B08687 /* liquidsend */;
+			target = 845915EF2F1A412C00B08687 /* Filz! */;
 			targetProxy = 8459160A2F1A412E00B08687 /* PBXContainerItemProxy */;
 		};
 		84B2000B2F80000100AE3A80 /* PBXTargetDependency */ = {
@@ -612,8 +614,10 @@
 		845916142F1A412E00B08687 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = catz;
+				ASSETCATALOG_COMPILER_APPICON_NAME = filz;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = liquidsendApp/liquidsend.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -653,8 +657,10 @@
 		845916152F1A412E00B08687 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = catz;
+				ASSETCATALOG_COMPILER_APPICON_NAME = filz;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = liquidsendApp/liquidsend.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -708,7 +714,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/liquidsend.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/liquidsend";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Filz!.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Filz!";
 			};
 			name = Debug;
 		};
@@ -729,7 +735,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/liquidsend.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/liquidsend";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Filz!.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Filz!";
 			};
 			name = Release;
 		};
@@ -888,7 +894,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		845915EB2F1A412C00B08687 /* Build configuration list for PBXProject "liquidsend" */ = {
+		845915EB2F1A412C00B08687 /* Build configuration list for PBXProject "Filz!" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				845916112F1A412E00B08687 /* Debug */,
@@ -897,7 +903,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		845916132F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsend" */ = {
+		845916132F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				845916142F1A412E00B08687 /* Debug */,
@@ -906,7 +912,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		845916162F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsendTests" */ = {
+		845916162F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!Tests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				845916172F1A412E00B08687 /* Debug */,
@@ -915,7 +921,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		845916192F1A412E00B08687 /* Build configuration list for PBXNativeTarget "liquidsendUITests" */ = {
+		845916192F1A412E00B08687 /* Build configuration list for PBXNativeTarget "Filz!UITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8459161A2F1A412E00B08687 /* Debug */,

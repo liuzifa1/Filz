@@ -45,6 +45,8 @@ final class SettingsModel {
     var quickSave: Bool
     var quickSaveFavourites: Bool
     var requirePIN: Bool
+    var receivePIN: String = ""
+    var favouriteDeviceTokens: [String] = []
     var saveMediaToGallery: Bool
     var autoFinish: Bool
     var saveToHistory: Bool
@@ -63,10 +65,12 @@ final class SettingsModel {
         quickSave: Bool = false,
         quickSaveFavourites: Bool = false,
         requirePIN: Bool = false,
+        receivePIN: String = "",
+        favouriteDeviceTokens: [String] = [],
         saveMediaToGallery: Bool = false,
         autoFinish: Bool = false,
         saveToHistory: Bool = true,
-        userName: String = "Sponge Bob",
+        userName: String = SettingsModel.defaultDeviceName(),
         isAdvancedNetworkingOn: Bool = false,
         autoAcceptShareLink: Bool = false,
         selectedDeviceIcon: AppDeviceIcon = .iphone,
@@ -78,6 +82,8 @@ final class SettingsModel {
         self.quickSave = quickSave
         self.quickSaveFavourites = quickSaveFavourites
         self.requirePIN = requirePIN
+        self.receivePIN = receivePIN
+        self.favouriteDeviceTokens = favouriteDeviceTokens
         self.saveMediaToGallery = saveMediaToGallery
         self.autoFinish = autoFinish
         self.saveToHistory = saveToHistory
@@ -89,5 +95,21 @@ final class SettingsModel {
         self.port = port
         self.discoveryTimeout = discoveryTimeout
         self.encryption = encryption
+    }
+
+    static func defaultDeviceName() -> String {
+        "Filz!\(Int.random(in: 1000...9999))"
+    }
+
+    func isFavourite(_ device: LocalSendDevice) -> Bool {
+        favouriteDeviceTokens.contains(device.id)
+    }
+
+    func toggleFavourite(_ device: LocalSendDevice) {
+        if let index = favouriteDeviceTokens.firstIndex(of: device.id) {
+            favouriteDeviceTokens.remove(at: index)
+        } else {
+            favouriteDeviceTokens.append(device.id)
+        }
     }
 }

@@ -17,13 +17,14 @@ struct AboutAppView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width:100)
-                    Text("Localsend")
+                    Text("Filz!")
                         .font(.headline)
                 }
-                Text("LocalSend scans for other clients on your local network and transfers files directly without the internet.")
+                Text("Filz is an app based on open-soured project Localsend, you can original localsend repository at")
                     .foregroundStyle(.secondary)
-                Link("Learn More...", destination: URL(string: "https://localsend.org")!)
+                Link("Here...", destination: URL(string: "https://localsend.org")!)
             }
         }
+        .navigationTitle("Filz!")
     }
 }

@@ -33,6 +33,7 @@ struct TransferHistoryDraft: Equatable {
     let timestamp: Date
     let direction: TransferDirection
     let peerName: String
+    let peerFingerprint: String?
     let fileNames: [String]
     let totalBytes: Int64
     let result: TransferResult
@@ -46,6 +47,7 @@ final class TransferHistoryEntry {
     var timestamp: Date
     var directionRaw: String
     var peerName: String
+    var peerFingerprint: String?
     var fileNamesData: Data
     var totalBytes: Int64
     var resultRaw: String
@@ -57,6 +59,7 @@ final class TransferHistoryEntry {
         timestamp = draft.timestamp
         directionRaw = draft.direction.rawValue
         peerName = draft.peerName
+        peerFingerprint = draft.peerFingerprint
         fileNamesData = (try? JSONEncoder().encode(draft.fileNames)) ?? Data()
         totalBytes = draft.totalBytes
         resultRaw = draft.result.rawValue

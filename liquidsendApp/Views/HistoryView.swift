@@ -13,12 +13,33 @@ private enum HistoryFilter: String, CaseIterable, Identifiable {
 
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(CoreStatus.self) private var coreStatus
     @Query(sort: \TransferHistoryEntry.timestamp, order: .reverse)
     private var entries: [TransferHistoryEntry]
 
     @State private var searchText = ""
     @State private var filter: HistoryFilter = .all
-    @State private var showClearConfirmation = false
+
+    private var activeTransfers: [ActiveTransfer] {
+        var transfers: [ActiveTransfer] = []
+        if let progress = coreStatus.sendProgress,
+           ["waiting", "sending"].contains(progress.status) {
+            transfers.append(ActiveTransfer(direction: .sent, progress: progress, request: nil))
+        }
+        if let request = coreStatus.pendingReceiveRequest {
+            transfers.append(ActiveTransfer(
+                direction: .received,
+                progress: receiveProgress(for: request),
+                request: request
+            ))
+            return transfers
+        }
+        if let progress = coreStatus.receiveProgress,
+           ["waiting", "approved", "receiving"].contains(progress.status) {
+            transfers.append(ActiveTransfer(direction: .received, progress: progress, request: nil))
+        }
+        return transfers
+    }
 
     private var filteredEntries: [TransferHistoryEntry] {
         entries.filter { entry in
@@ -36,9 +57,73 @@ struct HistoryView: View {
         }
     }
 
+    private var groupedEntries: [HistoryTimeGroup] {
+        var groups: [HistoryTimeGroup] = []
+        for entry in filteredEntries {
+            if let last = groups.last,
+               let newest = last.entries.first,
+               abs(newest.timestamp.timeIntervalSince(entry.timestamp)) <= 15 * 60 {
+                groups[groups.count - 1].entries.append(entry)
+            } else {
+                groups.append(HistoryTimeGroup(entries: [entry]))
+            }
+        }
+        return groups
+    }
+
     var body: some View {
         List {
-            if filteredEntries.isEmpty {
+            if !activeTransfers.isEmpty {
+                Section("Active Transfers") {
+                    ForEach(activeTransfers) { transfer in
+                        NavigationLink {
+                            if let request = transfer.request {
+                                IncomingReceiveRequestDetailView(request: request) { accepted in
+                                    coreStatus.decideReceive(accepted: accepted)
+                                }
+                            } else {
+                                TransferProgressDetailView(direction: transfer.direction, progress: transfer.progress)
+                            }
+                        } label: {
+                            ActiveTransferRow(transfer: transfer)
+                        }
+                        .swipeActions(edge: .leading) {
+                            if transfer.request != nil {
+                                Button("Accept", systemImage: "checkmark") {
+                                    coreStatus.decideReceive(accepted: true)
+                                }
+                                .tint(.green)
+                            } else if transfer.direction == .received,
+                                      transfer.progress.status == "waiting",
+                                      let requestID = transfer.progress.requestID {
+                                Button("Accept", systemImage: "checkmark") {
+                                    coreStatus.decideReceive(requestID: requestID, accepted: true)
+                                }
+                                .tint(.green)
+                            }
+                        }
+                        .swipeActions {
+                            if transfer.request != nil {
+                                Button("Decline", systemImage: "xmark", role: .destructive) {
+                                    coreStatus.decideReceive(accepted: false)
+                                }
+                            } else if transfer.direction == .received,
+                                      transfer.progress.status == "waiting",
+                                      let requestID = transfer.progress.requestID {
+                                Button("Decline", systemImage: "xmark", role: .destructive) {
+                                    coreStatus.decideReceive(requestID: requestID, accepted: false)
+                                }
+                            } else {
+                                Button("Cancel", systemImage: "xmark", role: .destructive) {
+                                    cancel(transfer)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if filteredEntries.isEmpty && activeTransfers.isEmpty {
                 ContentUnavailableView {
                     Label(
                         entries.isEmpty ? "No Transfers Yet" : "No Matching Transfers",
@@ -48,14 +133,20 @@ struct HistoryView: View {
                     Text(entries.isEmpty ? "Completed sends and receives will appear here." : "Change the search or filter.")
                 }
             } else {
-                ForEach(filteredEntries) { entry in
-                    NavigationLink {
-                        HistoryDetailView(entry: entry)
-                    } label: {
-                        HistoryRow(entry: entry)
+                ForEach(groupedEntries) { group in
+                    Section(group.title) {
+                        ForEach(group.entries) { entry in
+                            NavigationLink {
+                                HistoryDetailView(entry: entry)
+                            } label: {
+                                HistoryRow(entry: entry)
+                            }
+                        }
+                        .onDelete { offsets in
+                            delete(offsets, from: group)
+                        }
                     }
                 }
-                .onDelete(perform: delete)
             }
         }
         .searchable(text: $searchText, prompt: "Device or file name")
@@ -72,32 +163,133 @@ struct HistoryView: View {
                 }
                 .accessibilityLabel("Filter history")
 
-                Button(role: .destructive) {
-                    showClearConfirmation = true
+                Button {
+                    FilesLocationOpener.openReceivedFiles()
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "folder")
                 }
-                .disabled(entries.isEmpty)
-                .accessibilityLabel("Clear history")
-            }
-        }
-        .confirmationDialog(
-            "Clear all transfer history?",
-            isPresented: $showClearConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Clear History", role: .destructive) {
-                entries.forEach(modelContext.delete)
-                try? modelContext.save()
+                .accessibilityLabel("Open received files")
             }
         }
     }
 
-    private func delete(at offsets: IndexSet) {
+    private func delete(_ offsets: IndexSet, from group: HistoryTimeGroup) {
         for index in offsets {
-            modelContext.delete(filteredEntries[index])
+            modelContext.delete(group.entries[index])
         }
         try? modelContext.save()
+    }
+
+    private func cancel(_ transfer: ActiveTransfer) {
+        switch transfer.direction {
+        case .sent: coreStatus.cancelSend()
+        case .received: coreStatus.cancelReceive()
+        }
+    }
+
+    private func receiveProgress(for request: IncomingLocalSendRequest) -> LocalSendTransferProgress {
+        coreStatus.receiveProgress ?? LocalSendTransferProgress(
+            requestID: request.id,
+            status: "waiting",
+            startedAtMillis: nil,
+            targetAlias: nil,
+            targetIP: nil,
+            targetPort: nil,
+            targetProtocol: nil,
+            senderAlias: request.senderAlias,
+            senderIP: request.senderIP,
+            senderPort: request.senderPort,
+            senderProtocol: request.senderProtocol,
+            senderFingerprint: request.senderFingerprint,
+            currentFile: nil,
+            sentBytes: nil,
+            receivedBytes: 0,
+            totalBytes: request.totalBytes,
+            completedFiles: 0,
+            totalFiles: request.files.count,
+            savedPaths: nil,
+            error: nil
+        )
+    }
+}
+
+private struct ActiveTransfer: Identifiable {
+    let direction: TransferDirection
+    let progress: LocalSendTransferProgress
+    let request: IncomingLocalSendRequest?
+
+    var id: String { request?.id ?? direction.rawValue }
+    var peerName: String {
+        switch direction {
+        case .sent: progress.targetAlias ?? "LocalSend device"
+        case .received: progress.senderAlias ?? "LocalSend device"
+        }
+    }
+}
+
+private struct HistoryTimeGroup: Identifiable {
+    var entries: [TransferHistoryEntry]
+
+    var id: UUID {
+        entries.first?.id ?? UUID()
+    }
+
+    var title: String {
+        guard let first = entries.first else { return "Transfers" }
+        if entries.count == 1 {
+            return first.timestamp.formatted(date: .abbreviated, time: .shortened)
+        }
+        let last = entries.last ?? first
+        return "\(first.timestamp.formatted(date: .abbreviated, time: .shortened)) - \(last.timestamp.formatted(date: .omitted, time: .shortened))"
+    }
+}
+
+private struct ActiveTransferRow: View {
+    let transfer: ActiveTransfer
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: transfer.direction.systemImage)
+                .font(.title3)
+                .foregroundStyle(transfer.direction == .sent ? .blue : .green)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(transfer.peerName).font(.headline)
+                    Spacer()
+                    Text(transfer.progress.status.capitalized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(value: transfer.progress.fractionCompleted)
+                    .animation(.linear(duration: 0.25), value: transfer.progress.fractionCompleted)
+                HStack {
+                    Text(statusDetail)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(transfer.progress.percentText)
+                        .monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusDetail: String {
+        if let currentFile = transfer.progress.currentFile {
+            return currentFile
+        }
+        switch (transfer.direction, transfer.progress.status) {
+        case (.received, "waiting"):
+            return "Approval required in Send"
+        case (.received, "approved"):
+            return "Accepted; waiting for upload"
+        case (.sent, "waiting"):
+            return "Waiting for recipient approval"
+        default:
+            return transfer.progress.status.capitalized
+        }
     }
 }
 
@@ -142,6 +334,16 @@ private struct HistoryDetailView: View {
             Section("Transfer") {
                 LabeledContent("Direction", value: entry.direction.title)
                 LabeledContent("Device", value: entry.peerName)
+                if let fingerprint = entry.peerFingerprint, !fingerprint.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Fingerprint")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(fingerprint)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
+                }
                 LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: entry.totalBytes, countStyle: .file))
                 LabeledContent("Date", value: entry.timestamp.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Status", value: entry.result.rawValue.capitalized)
@@ -149,16 +351,21 @@ private struct HistoryDetailView: View {
             Section("Files") {
                 ForEach(Array(entry.fileNames.enumerated()), id: \.offset) { index, name in
                     HStack {
-                        Image(systemName: "doc")
+                        Image(systemName: FileIcon.systemImage(forFileName: name))
+                            .foregroundStyle(.secondary)
                         Text(name)
                             .lineLimit(2)
                         Spacer()
                         if index < entry.savedPaths.count {
-                            ShareLink(item: URL(fileURLWithPath: entry.savedPaths[index])) {
-                                Image(systemName: "square.and.arrow.up")
-                            }
-                            .accessibilityLabel("Share \(name)")
+                            Text(URL(fileURLWithPath: entry.savedPaths[index]).deletingLastPathComponent().lastPathComponent)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
+                    }
+                }
+                if !entry.savedPaths.isEmpty {
+                    Button("Open in Files", systemImage: "folder") {
+                        FilesLocationOpener.openReceivedFiles()
                     }
                 }
             }

@@ -1,10 +1,57 @@
 import Foundation
 
+struct SharedFavouriteDevice: Codable, Identifiable, Hashable {
+    let id: String
+    let alias: String
+    let endpoint: String
+    let systemImage: String
+}
+
+struct SharedAttachmentImport {
+    let urls: [URL]
+    let selectedFavouriteIDs: [String]
+    let openDestinationPicker: Bool
+}
+
 enum SharedAttachmentInbox {
     static let appGroup = "group.top.kitsune.filz"
     static let urlScheme = "liquidsend"
+    private static let favouritesFileName = "Favourite Devices.json"
+    private static let selectionFileName = "Share Selection.json"
 
     static func importPendingFiles() -> [URL] {
+        importPendingShare().urls
+    }
+
+    static func importPendingShare() -> SharedAttachmentImport {
+        let selection = consumeShareSelection()
+        return SharedAttachmentImport(
+            urls: movePendingFiles(),
+            selectedFavouriteIDs: selection.selectedFavouriteIDs,
+            openDestinationPicker: selection.openDestinationPicker
+        )
+    }
+
+    static func exportFavouriteDevices(settings: SettingsModel, devices: [LocalSendDevice]) {
+        guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            return
+        }
+        let snapshots = settings.favouriteDeviceTokens.map { token in
+            let device = devices.first { $0.id == token || $0.token == token }
+            return SharedFavouriteDevice(
+                id: token,
+                alias: device?.alias ?? "Saved Device",
+                endpoint: device?.endpoint ?? token,
+                systemImage: device?.systemImage ?? "desktopcomputer"
+            )
+        }
+        let url = group.appending(path: favouritesFileName)
+        if let data = try? JSONEncoder().encode(snapshots) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    private static func movePendingFiles() -> [URL] {
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
             return []
         }
@@ -33,6 +80,19 @@ enum SharedAttachmentInbox {
         }
     }
 
+    private static func consumeShareSelection() -> (selectedFavouriteIDs: [String], openDestinationPicker: Bool) {
+        guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            return ([], false)
+        }
+        let url = group.appending(path: selectionFileName)
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let data = try? Data(contentsOf: url),
+              let selection = try? JSONDecoder().decode(ShareSelection.self, from: data) else {
+            return ([], false)
+        }
+        return (selection.selectedFavouriteIDs, selection.openDestinationPicker)
+    }
+
     private static func uniqueURL(in directory: URL, named name: String) -> URL {
         let initial = directory.appending(path: name)
         guard FileManager.default.fileExists(atPath: initial.path) else { return initial }
@@ -47,5 +107,10 @@ enum SharedAttachmentInbox {
             }
         }
         return directory.appending(path: "\(UUID().uuidString)-\(name)")
+    }
+
+    private struct ShareSelection: Codable {
+        let selectedFavouriteIDs: [String]
+        let openDestinationPicker: Bool
     }
 }

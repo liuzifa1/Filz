@@ -9,6 +9,8 @@ nonisolated struct TransferActivityAttributes: ActivityAttributes {
         var totalBytes: UInt64
         var completedFiles: Int
         var totalFiles: Int
+        var actionHint: String?
+        var deepLink: String?
 
         var fractionCompleted: Double {
             guard totalBytes > 0 else { return status == "finished" ? 1 : 0 }

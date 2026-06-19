@@ -45,6 +45,9 @@ enum LocalSendCoreClient {
         deviceModel: String,
         deviceType: UInt8
     ) -> String? {
+        if let error = configureTLSIdentity(commonName: alias) {
+            return error
+        }
         let result: Int32 = alias.withCString { aliasPointer in
             deviceModel.withCString { deviceModelPointer in
                 token.withCString { tokenPointer in
@@ -62,6 +65,39 @@ enum LocalSendCoreClient {
         return result == 0 ? nil : lastError ?? "Unable to start LocalSend Core"
     }
 
+    private static func configureTLSIdentity(commonName: String) -> String? {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appending(path: "LocalSend TLS", directoryHint: .isDirectory)
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+            )
+        } catch {
+            return "Unable to create the TLS identity directory: \(error.localizedDescription)"
+        }
+
+        let result = directory.path.withCString { directoryPointer in
+            commonName.withCString { commonNamePointer in
+                localsendcore_configure_tls_identity(directoryPointer, commonNamePointer)
+            }
+        }
+        if result == 0 {
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var protectedDirectory = directory
+            try? protectedDirectory.setResourceValues(values)
+            for fileName in ["certificate.pem", "private-key.pem"] {
+                try? FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    ofItemAtPath: directory.appending(path: fileName).path
+                )
+            }
+        }
+        return result == 0 ? nil : lastError ?? "Unable to configure HTTPS identity"
+    }
+
     static func stopServer() {
         localsendcore_stop_server()
     }
@@ -71,6 +107,16 @@ enum LocalSendCoreClient {
             localsendcore_set_receive_directory(path)
         }
         return result == 0 ? nil : lastError ?? "Unable to configure receive directory"
+    }
+
+    static func configureReceivePIN(_ pin: String?) -> String? {
+        let result: Int32
+        if let pin, !pin.isEmpty {
+            result = pin.withCString { localsendcore_set_receive_pin($0) }
+        } else {
+            result = localsendcore_set_receive_pin(nil)
+        }
+        return result == 0 ? nil : lastError ?? "Unable to configure receive PIN"
     }
 
     static var identityToken: String {
@@ -128,6 +174,7 @@ enum LocalSendCoreClient {
     nonisolated static func sendFiles(
         _ files: [LocalSendFile],
         to device: LocalSendDevice,
+        recipientPIN: String?,
         senderAlias: String,
         senderPort: UInt16,
         senderDeviceModel: String,
@@ -141,22 +188,25 @@ enum LocalSendCoreClient {
         let result: Int32 = device.ip.withCString { targetIP in
             device.protocol.withCString { targetProtocol in
                 device.alias.withCString { targetAlias in
-                    senderAlias.withCString { alias in
-                        senderDeviceModel.withCString { model in
-                            senderToken.withCString { token in
-                                filesJSON.withCString { files in
-                                    localsendcore_send_files_json(
-                                        targetIP,
-                                        device.port,
-                                        targetProtocol,
-                                        targetAlias,
-                                        alias,
-                                        senderPort,
-                                        model,
-                                        senderDeviceType,
-                                        token,
-                                        files
-                                    )
+                    withOptionalCString(recipientPIN) { targetPIN in
+                        senderAlias.withCString { alias in
+                            senderDeviceModel.withCString { model in
+                                senderToken.withCString { token in
+                                    filesJSON.withCString { files in
+                                        localsendcore_send_files_json(
+                                            targetIP,
+                                            device.port,
+                                            targetProtocol,
+                                            targetAlias,
+                                            targetPIN,
+                                            alias,
+                                            senderPort,
+                                            model,
+                                            senderDeviceType,
+                                            token,
+                                            files
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -169,6 +219,14 @@ enum LocalSendCoreClient {
         }
         let error = String(cString: pointer)
         return error.isEmpty ? "Unable to send files" : error
+    }
+
+    nonisolated private static func withOptionalCString<T>(
+        _ value: String?,
+        body: (UnsafePointer<CChar>?) -> T
+    ) -> T {
+        guard let value, !value.isEmpty else { return body(nil) }
+        return value.withCString(body)
     }
 
     static var pendingReceiveRequest: IncomingLocalSendRequest? {
@@ -188,6 +246,14 @@ enum LocalSendCoreClient {
             localsendcore_decide_receive(requestID, accepted)
         }
         return result == 0 ? nil : lastError ?? "Unable to answer receive request"
+    }
+
+    static func cancelSend() {
+        localsendcore_cancel_send()
+    }
+
+    static func cancelReceive() {
+        localsendcore_cancel_receive()
     }
 
     static func refreshDiscovery() {

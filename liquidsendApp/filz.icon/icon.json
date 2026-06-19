@@ -12,10 +12,10 @@
           "image-name" : "IMG_6408 2.png",
           "name" : "IMG_6408 2",
           "position" : {
-            "scale" : 5,
+            "scale" : 1,
             "translation-in-points" : [
-              57.440752163461184,
-              165.27849357639184
+              0,
+              11.5
             ]
           }
         }

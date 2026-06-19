@@ -4,7 +4,7 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Response, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
@@ -27,6 +27,10 @@ pub struct IncomingRequest {
     pub id: String,
     pub sender_alias: String,
     pub sender_ip: String,
+    pub sender_port: u16,
+    pub sender_protocol: String,
+    pub sender_token: String,
+    pub sender_fingerprint: String,
     pub files: Vec<IncomingFile>,
     pub total_bytes: u64,
 }
@@ -34,8 +38,14 @@ pub struct IncomingRequest {
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiveProgress {
+    pub request_id: Option<String>,
     pub status: String,
+    pub started_at_millis: Option<u64>,
     pub sender_alias: String,
+    pub sender_ip: Option<String>,
+    pub sender_port: Option<u16>,
+    pub sender_protocol: Option<String>,
+    pub sender_fingerprint: Option<String>,
     pub current_file: Option<String>,
     pub received_bytes: u64,
     pub total_bytes: u64,
@@ -70,15 +80,31 @@ struct ActiveSession {
 
 struct ReceiveManager {
     directory: PathBuf,
+    pin: Option<String>,
     pending: Option<PendingRequest>,
     active: Option<ActiveSession>,
     progress: ReceiveProgress,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct V1SenderInfo {
+    alias: String,
+    device_model: Option<String>,
+    device_type: Option<crate::model::discovery::DeviceType>,
+}
+
+#[derive(Deserialize)]
+struct V1PrepareUploadRequest {
+    info: V1SenderInfo,
+    files: HashMap<String, FileDto>,
 }
 
 impl Default for ReceiveManager {
     fn default() -> Self {
         Self {
             directory: std::env::temp_dir().join("LiquidSend Received Files"),
+            pin: None,
             pending: None,
             active: None,
             progress: ReceiveProgress::default(),
@@ -98,6 +124,13 @@ fn lock_manager() -> std::sync::MutexGuard<'static, ReceiveManager> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+fn unix_time_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 pub fn set_directory(path: String) -> Result<(), String> {
     let path = PathBuf::from(path);
     std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
@@ -105,11 +138,16 @@ pub fn set_directory(path: String) -> Result<(), String> {
     Ok(())
 }
 
+pub fn set_pin(pin: Option<String>) {
+    lock_manager().pin = pin.filter(|value| !value.is_empty());
+}
+
 pub fn pending_json() -> String {
     serde_json::to_string(
         &lock_manager()
             .pending
             .as_ref()
+            .filter(|pending| pending.decision.is_some())
             .map(|pending| &pending.public),
     )
     .unwrap_or_else(|_| "null".to_string())
@@ -130,6 +168,23 @@ pub fn reset() {
     }
     state.pending = None;
     state.active = None;
+    state.pin = None;
+}
+
+pub fn cancel_current() {
+    let mut state = lock_manager();
+    if let Some(sender) = state
+        .pending
+        .as_mut()
+        .and_then(|pending| pending.decision.take())
+    {
+        let _ = sender.send(false);
+    }
+    state.pending = None;
+    state.active = None;
+    state.progress.status = "canceled".to_string();
+    state.progress.current_file = None;
+    state.progress.error = None;
 }
 
 pub fn decide(request_id: &str, accepted: bool) -> Result<(), String> {
@@ -142,17 +197,24 @@ pub fn decide(request_id: &str, accepted: bool) -> Result<(), String> {
         if pending.public.id != request_id {
             return Err("The receive request is no longer active".to_string());
         }
-        pending
+        let sender = pending
             .decision
             .take()
-            .ok_or_else(|| "The receive request was already answered".to_string())?
+            .ok_or_else(|| "The receive request was already answered".to_string())?;
+        state.progress.status = if accepted { "approved" } else { "declined" }.to_string();
+        sender
     };
     sender
         .send(accepted)
         .map_err(|_| "The sender disconnected before the decision was delivered".to_string())
 }
 
-pub async fn prepare_upload(body: Incoming, sender_ip: IpAddr) -> Response<Full<Bytes>> {
+pub async fn prepare_upload(
+    body: Incoming,
+    sender_ip: IpAddr,
+    request_pin: Option<&str>,
+    sender_fingerprint: Option<String>,
+) -> Response<Full<Bytes>> {
     let payload = match body.collect().await {
         Ok(body) => match serde_json::from_slice::<PrepareUploadRequestDto>(&body.to_bytes()) {
             Ok(payload) => payload,
@@ -160,6 +222,57 @@ pub async fn prepare_upload(body: Incoming, sender_ip: IpAddr) -> Response<Full<
         },
         Err(_) => return error_response(StatusCode::BAD_REQUEST, "Could not read request body"),
     };
+    prepare_payload(payload, sender_ip, request_pin, sender_fingerprint, false).await
+}
+
+pub async fn prepare_upload_v1(
+    body: Incoming,
+    sender_ip: IpAddr,
+    request_pin: Option<&str>,
+    sender_fingerprint: String,
+) -> Response<Full<Bytes>> {
+    let payload = match body.collect().await {
+        Ok(body) => match serde_json::from_slice::<V1PrepareUploadRequest>(&body.to_bytes()) {
+            Ok(payload) => payload,
+            Err(_) => return error_response(StatusCode::BAD_REQUEST, "Request body malformed"),
+        },
+        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Could not read request body"),
+    };
+    let payload = PrepareUploadRequestDto {
+        info: crate::http::dto::RegisterDto {
+            alias: payload.info.alias,
+            version: "1.0".to_string(),
+            device_model: payload.info.device_model,
+            device_type: payload.info.device_type,
+            token: sender_fingerprint.clone(),
+            port: 0,
+            protocol: crate::http::dto::ProtocolType::Https,
+            has_web_interface: false,
+        },
+        files: payload.files,
+    };
+    prepare_payload(
+        payload,
+        sender_ip,
+        request_pin,
+        Some(sender_fingerprint),
+        true,
+    )
+    .await
+}
+
+async fn prepare_payload(
+    payload: PrepareUploadRequestDto,
+    sender_ip: IpAddr,
+    request_pin: Option<&str>,
+    sender_fingerprint: Option<String>,
+    v1_response: bool,
+) -> Response<Full<Bytes>> {
+    if let Some(expected_pin) = lock_manager().pin.clone() {
+        if request_pin != Some(expected_pin.as_str()) {
+            return error_response(StatusCode::UNAUTHORIZED, "Invalid PIN");
+        }
+    }
     if payload.files.is_empty() {
         return error_response(
             StatusCode::BAD_REQUEST,
@@ -168,11 +281,18 @@ pub async fn prepare_upload(body: Incoming, sender_ip: IpAddr) -> Response<Full<
     }
 
     let request_id = uuid::Uuid::new_v4().to_string();
+    let sender_fingerprint = sender_fingerprint
+        .filter(|fingerprint| !fingerprint.is_empty())
+        .unwrap_or_else(|| payload.info.token.clone());
     let total_bytes = payload.files.values().map(|file| file.size).sum();
     let public = IncomingRequest {
         id: request_id.clone(),
         sender_alias: payload.info.alias.clone(),
         sender_ip: sender_ip.to_string(),
+        sender_port: payload.info.port,
+        sender_protocol: payload.info.protocol.as_str().to_string(),
+        sender_token: sender_fingerprint.clone(),
+        sender_fingerprint: sender_fingerprint.clone(),
         files: payload
             .files
             .values()
@@ -192,8 +312,14 @@ pub async fn prepare_upload(body: Incoming, sender_ip: IpAddr) -> Response<Full<
             return error_response(StatusCode::CONFLICT, "Blocked by another session");
         }
         state.progress = ReceiveProgress {
+            request_id: Some(request_id.clone()),
             status: "waiting".to_string(),
+            started_at_millis: Some(unix_time_millis()),
             sender_alias: payload.info.alias.clone(),
+            sender_ip: Some(sender_ip.to_string()),
+            sender_port: (payload.info.port != 0).then_some(payload.info.port),
+            sender_protocol: Some(payload.info.protocol.as_str().to_string()),
+            sender_fingerprint: Some(sender_fingerprint),
             total_bytes,
             total_files: payload.files.len(),
             ..ReceiveProgress::default()
@@ -250,13 +376,17 @@ pub async fn prepare_upload(body: Incoming, sender_ip: IpAddr) -> Response<Full<
             files: active_files,
         });
     }
-    json_response(
-        StatusCode::OK,
-        &PrepareUploadResponseDto {
-            session_id,
-            files: response_files,
-        },
-    )
+    if v1_response {
+        json_response(StatusCode::OK, &response_files)
+    } else {
+        json_response(
+            StatusCode::OK,
+            &PrepareUploadResponseDto {
+                session_id,
+                files: response_files,
+            },
+        )
+    }
 }
 
 #[cfg(test)]
@@ -284,9 +414,28 @@ mod tests {
 }
 
 pub async fn upload(
-    mut body: Incoming,
+    body: Incoming,
     sender_ip: IpAddr,
     session_id: &str,
+    file_id: &str,
+    token: &str,
+) -> Response<Full<Bytes>> {
+    upload_inner(body, sender_ip, Some(session_id), file_id, token).await
+}
+
+pub async fn upload_v1(
+    body: Incoming,
+    sender_ip: IpAddr,
+    file_id: &str,
+    token: &str,
+) -> Response<Full<Bytes>> {
+    upload_inner(body, sender_ip, None, file_id, token).await
+}
+
+async fn upload_inner(
+    mut body: Incoming,
+    sender_ip: IpAddr,
+    session_id: Option<&str>,
     file_id: &str,
     token: &str,
 ) -> Response<Full<Bytes>> {
@@ -295,7 +444,9 @@ pub async fn upload(
         let Some(session) = state.active.as_ref() else {
             return error_response(StatusCode::CONFLICT, "No session");
         };
-        if session.sender_ip != sender_ip || session.id != session_id {
+        if session.sender_ip != sender_ip
+            || session_id.is_some_and(|session_id| session.id != session_id)
+        {
             return error_response(StatusCode::FORBIDDEN, "Invalid session");
         }
         let Some(file) = session.files.get(file_id) else {
@@ -396,7 +547,9 @@ pub fn cancel(sender_ip: IpAddr, session_id: Option<&str>) -> Response<Full<Byte
         }
     }
     if let Some(active) = state.active.as_ref() {
-        if active.sender_ip == sender_ip && session_id == Some(active.id.as_str()) {
+        if active.sender_ip == sender_ip
+            && session_id.is_none_or(|session_id| session_id == active.id)
+        {
             state.active = None;
             state.progress.status = "canceled".to_string();
             return empty_response(StatusCode::OK);

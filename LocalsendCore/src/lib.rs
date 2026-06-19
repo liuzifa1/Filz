@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::ffi::{c_char, CStr, CString};
 #[cfg(feature = "http")]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
 #[cfg(feature = "http")]
 use std::sync::Arc;
+use std::sync::{Mutex, OnceLock};
 #[cfg(feature = "http")]
 use std::thread::JoinHandle;
 #[cfg(feature = "http")]
@@ -22,6 +22,8 @@ pub mod http;
 pub mod model;
 #[cfg(feature = "http")]
 mod receive;
+#[cfg(feature = "http")]
+mod tls_identity;
 pub(crate) mod util;
 pub mod webrtc;
 
@@ -65,7 +67,11 @@ struct SendFileInput {
 #[serde(rename_all = "camelCase")]
 struct SendProgress {
     status: String,
+    started_at_millis: Option<u64>,
     target_alias: String,
+    target_ip: String,
+    target_port: u16,
+    target_protocol: String,
     current_file: Option<String>,
     sent_bytes: u64,
     total_bytes: u64,
@@ -76,6 +82,8 @@ struct SendProgress {
 
 #[cfg(feature = "http")]
 static SEND_PROGRESS: OnceLock<Mutex<SendProgress>> = OnceLock::new();
+#[cfg(feature = "http")]
+static SEND_CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "http")]
 fn send_progress() -> &'static Mutex<SendProgress> {
@@ -89,6 +97,14 @@ fn update_send_progress(update: impl FnOnce(&mut SendProgress)) {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner),
     );
+}
+
+#[cfg(feature = "http")]
+fn unix_time_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn last_error() -> &'static Mutex<CString> {
@@ -172,6 +188,50 @@ pub extern "C" fn localsendcore_set_receive_directory(path: *const c_char) -> i3
 }
 
 #[cfg(feature = "http")]
+#[no_mangle]
+pub extern "C" fn localsendcore_set_receive_pin(pin: *const c_char) -> i32 {
+    let result = if pin.is_null() {
+        Ok(None)
+    } else {
+        read_c_string(pin, "receive PIN").map(Some)
+    };
+    match result {
+        Ok(pin) => {
+            receive::set_pin(pin);
+            set_last_error("");
+            0
+        }
+        Err(error) => {
+            set_last_error(error);
+            -1
+        }
+    }
+}
+
+#[cfg(feature = "http")]
+#[no_mangle]
+pub extern "C" fn localsendcore_configure_tls_identity(
+    directory: *const c_char,
+    common_name: *const c_char,
+) -> i32 {
+    let result = read_c_string(directory, "TLS identity directory").and_then(|directory| {
+        let common_name = read_c_string(common_name, "TLS identity name")?;
+        tls_identity::configure(std::path::Path::new(&directory), &common_name)
+            .map_err(|error| error.to_string())
+    });
+    match result {
+        Ok(()) => {
+            set_last_error("");
+            0
+        }
+        Err(error) => {
+            set_last_error(error);
+            -1
+        }
+    }
+}
+
+#[cfg(feature = "http")]
 fn owned_json(value: String) -> *mut c_char {
     CString::new(value).unwrap().into_raw()
 }
@@ -214,6 +274,23 @@ pub extern "C" fn localsendcore_decide_receive(request_id: *const c_char, accept
 
 #[cfg(feature = "http")]
 #[no_mangle]
+pub extern "C" fn localsendcore_cancel_send() {
+    SEND_CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+    update_send_progress(|progress| {
+        progress.status = "canceled".to_string();
+        progress.current_file = None;
+        progress.error = None;
+    });
+}
+
+#[cfg(feature = "http")]
+#[no_mangle]
+pub extern "C" fn localsendcore_cancel_receive() {
+    receive::cancel_current();
+}
+
+#[cfg(feature = "http")]
+#[no_mangle]
 pub extern "C" fn localsendcore_send_file(
     target_ip: *const c_char,
     target_port: u16,
@@ -227,6 +304,7 @@ pub extern "C" fn localsendcore_send_file(
     file_name: *const c_char,
     file_type: *const c_char,
 ) -> i32 {
+    SEND_CANCEL_REQUESTED.store(false, Ordering::SeqCst);
     let result = (|| -> Result<(), String> {
         let target_ip = read_c_string(target_ip, "target IP")?;
         let target_protocol = read_c_string(target_protocol, "target protocol")?;
@@ -263,6 +341,7 @@ pub extern "C" fn localsendcore_send_file(
             device_type,
             sender_token,
             "LocalSend device".to_string(),
+            None,
             vec![SendFileInput {
                 file_path,
                 file_name,
@@ -290,6 +369,7 @@ pub extern "C" fn localsendcore_send_files_json(
     target_port: u16,
     target_protocol: *const c_char,
     target_alias: *const c_char,
+    target_pin: *const c_char,
     sender_alias: *const c_char,
     sender_port: u16,
     sender_device_model: *const c_char,
@@ -297,10 +377,16 @@ pub extern "C" fn localsendcore_send_files_json(
     sender_token: *const c_char,
     files_json: *const c_char,
 ) -> i32 {
+    SEND_CANCEL_REQUESTED.store(false, Ordering::SeqCst);
     let result = (|| -> Result<(), String> {
         let target_ip = read_c_string(target_ip, "target IP")?;
         let target_protocol = read_c_string(target_protocol, "target protocol")?;
         let target_alias = read_c_string(target_alias, "target alias")?;
+        let target_pin = if target_pin.is_null() {
+            None
+        } else {
+            Some(read_c_string(target_pin, "target PIN")?).filter(|pin| !pin.is_empty())
+        };
         let sender_alias = read_c_string(sender_alias, "sender alias")?;
         let sender_device_model = read_c_string(sender_device_model, "sender device model")?;
         let sender_token = read_c_string(sender_token, "sender token")?;
@@ -332,6 +418,7 @@ pub extern "C" fn localsendcore_send_files_json(
             device_type,
             sender_token,
             target_alias,
+            target_pin,
             files,
         )
     })();
@@ -341,10 +428,17 @@ pub extern "C" fn localsendcore_send_files_json(
             0
         }
         Err(error) => {
-            update_send_progress(|progress| {
-                progress.status = "failed".to_string();
-                progress.error = Some(error.clone());
-            });
+            if SEND_CANCEL_REQUESTED.load(Ordering::SeqCst) {
+                update_send_progress(|progress| {
+                    progress.status = "canceled".to_string();
+                    progress.error = None;
+                });
+            } else {
+                update_send_progress(|progress| {
+                    progress.status = "failed".to_string();
+                    progress.error = Some(error.clone());
+                });
+            }
             set_last_error(error);
             -1
         }
@@ -362,6 +456,7 @@ fn send_files_blocking(
     sender_device_type: crate::model::discovery::DeviceType,
     sender_token: String,
     target_alias: String,
+    target_pin: Option<String>,
     files: Vec<SendFileInput>,
 ) -> Result<(), String> {
     if target_port == 0 || sender_port == 0 {
@@ -383,6 +478,7 @@ fn send_files_blocking(
             sender_device_type,
             sender_token,
             target_alias,
+            target_pin,
             files,
         ))
         .map_err(|error| error.to_string())
@@ -399,12 +495,16 @@ async fn send_files_v2(
     sender_device_type: crate::model::discovery::DeviceType,
     sender_token: String,
     target_alias: String,
+    target_pin: Option<String>,
     files: Vec<SendFileInput>,
 ) -> anyhow::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
+    let tls_identity = tls_identity::current()?;
     let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .danger_accept_invalid_certs(true)
+        .use_preconfigured_tls(crate::http::client::local_send_tls_config(
+            &tls_identity.private_key,
+            &tls_identity.cert,
+        )?)
         .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
@@ -420,7 +520,11 @@ async fn send_files_v2(
     update_send_progress(|progress| {
         *progress = SendProgress {
             status: "waiting".to_string(),
+            started_at_millis: Some(unix_time_millis()),
             target_alias,
+            target_ip: target_ip.clone(),
+            target_port,
+            target_protocol: protocol.as_str().to_string(),
             total_bytes,
             total_files: prepared_files.len(),
             ..SendProgress::default()
@@ -433,7 +537,7 @@ async fn send_files_v2(
         device_type: Some(sender_device_type),
         token: sender_token,
         port: sender_port,
-        protocol: crate::http::dto::ProtocolType::Http,
+        protocol: crate::http::dto::ProtocolType::Https,
         has_web_interface: false,
     };
     let request = crate::http::dto::PrepareUploadRequestDto {
@@ -463,11 +567,18 @@ async fn send_files_v2(
         host,
         target_port
     );
-    let response = client
-        .post(format!("{base_url}/prepare-upload"))
-        .json(&request)
-        .send()
-        .await?;
+    let mut prepare_url = reqwest::Url::parse(&format!("{base_url}/prepare-upload"))?;
+    if let Some(pin) = target_pin {
+        prepare_url.query_pairs_mut().append_pair("pin", &pin);
+    }
+    let prepare_request = client.post(prepare_url).json(&request).send();
+    let response = tokio::select! {
+        response = prepare_request => response?,
+        _ = wait_for_send_cancel() => {
+            let _ = client.post(format!("{base_url}/cancel")).send().await;
+            return Err(anyhow::anyhow!("Transfer canceled"));
+        }
+    };
 
     if response.status() == reqwest::StatusCode::NO_CONTENT {
         return Err(anyhow::anyhow!("The recipient did not accept the files"));
@@ -475,7 +586,6 @@ async fn send_files_v2(
     if response.status() != reqwest::StatusCode::OK {
         return Err(http_response_error(response).await);
     }
-
     let prepared = response
         .json::<crate::http::dto::PrepareUploadResponseDto>()
         .await?;
@@ -490,6 +600,14 @@ async fn send_files_v2(
     });
     update_send_progress(|progress| progress.status = "sending".to_string());
     for (file_id, input, file_size) in prepared_files {
+        if SEND_CANCEL_REQUESTED.load(Ordering::SeqCst) {
+            let _ = client
+                .post(format!("{base_url}/cancel"))
+                .query(&[("sessionId", prepared.session_id.clone())])
+                .send()
+                .await;
+            return Err(anyhow::anyhow!("Transfer canceled"));
+        }
         let Some(file_token) = prepared.files.get(&file_id).cloned() else {
             continue;
         };
@@ -502,6 +620,9 @@ async fn send_files_v2(
             };
             let mut buffer = vec![0_u8; 64 * 1024];
             loop {
+                if SEND_CANCEL_REQUESTED.load(Ordering::SeqCst) {
+                    break;
+                }
                 match file.read(&mut buffer).await {
                     Ok(0) => break,
                     Ok(length) => {
@@ -516,7 +637,7 @@ async fn send_files_v2(
         });
         let stream =
             tokio_stream::wrappers::ReceiverStream::new(rx).map(Ok::<Vec<u8>, std::io::Error>);
-        let response = client
+        let upload_request = client
             .post(format!("{base_url}/upload"))
             .query(&[
                 ("sessionId", prepared.session_id.clone()),
@@ -526,8 +647,18 @@ async fn send_files_v2(
             .header(reqwest::header::CONTENT_LENGTH, file_size)
             .header(reqwest::header::CONTENT_TYPE, input.file_type)
             .body(reqwest::Body::wrap_stream(stream))
-            .send()
-            .await?;
+            .send();
+        let response = tokio::select! {
+            response = upload_request => response?,
+            _ = wait_for_send_cancel() => {
+                let _ = client
+                    .post(format!("{base_url}/cancel"))
+                    .query(&[("sessionId", prepared.session_id.clone())])
+                    .send()
+                    .await;
+                return Err(anyhow::anyhow!("Transfer canceled"));
+            }
+        };
         if response.status() != reqwest::StatusCode::OK {
             return Err(http_response_error(response).await);
         }
@@ -538,6 +669,13 @@ async fn send_files_v2(
         progress.current_file = None;
     });
     Ok(())
+}
+
+#[cfg(feature = "http")]
+async fn wait_for_send_cancel() {
+    while !SEND_CANCEL_REQUESTED.load(Ordering::SeqCst) {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
 }
 
 #[cfg(feature = "http")]
@@ -599,6 +737,14 @@ pub extern "C" fn localsendcore_start_server(
         return -1;
     }
 
+    let tls_identity = match tls_identity::current() {
+        Ok(identity) => identity,
+        Err(error) => {
+            set_last_error(error.to_string());
+            return -1;
+        }
+    };
+
     let state_mutex = SERVER_STATE.get_or_init(|| Mutex::new(ServerState::new()));
     let mut state = state_mutex.lock().unwrap();
     if state.running.load(Ordering::SeqCst) {
@@ -644,10 +790,25 @@ pub extern "C" fn localsendcore_start_server(
             token,
         };
 
-        runtime.spawn(crate::discovery::run(port, info.clone(), discovery_rx));
+        let discovery_info = info.clone();
+        runtime.spawn(async move {
+            if let Err(error) = crate::discovery::run(port, discovery_info, discovery_rx).await {
+                set_last_error(format!(
+                    "Nearby discovery unavailable: {error}. Receiving by IP is still available."
+                ));
+            }
+        });
 
         if let Err(error) = runtime.block_on(crate::http::server::run_with_port_and_ready(
-            port, None, info, true, stop_rx, ready_tx,
+            port,
+            Some(crate::http::server::TlsConfig {
+                cert: tls_identity.cert,
+                private_key: tls_identity.private_key,
+            }),
+            info,
+            true,
+            stop_rx,
+            ready_tx,
         )) {
             set_last_error(error.to_string());
         }
@@ -719,9 +880,16 @@ mod tests {
 
     fn ffi_test_lock() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
+        let guard = LOCK
+            .get_or_init(|| Mutex::new(()))
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        static TLS_DIRECTORY: OnceLock<std::path::PathBuf> = OnceLock::new();
+        let directory = TLS_DIRECTORY.get_or_init(|| {
+            std::env::temp_dir().join(format!("localsendcore-ffi-tls-{}", uuid::Uuid::new_v4()))
+        });
+        tls_identity::configure(directory, "Filz FFI Test").unwrap();
+        guard
     }
 
     impl Drop for ServerGuard {
@@ -755,22 +923,35 @@ mod tests {
         let body = format!(
             r#"{{"alias":"Client","version":"2.1","deviceModel":"Mac","deviceType":"desktop","fingerprint":"client-token","port":{port},"protocol":"http","download":false}}"#
         );
-        let request = format!(
-            "POST /api/localsend/v2/register HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.len()
-        );
-        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_secs(2)))
-            .unwrap();
-        stream.write_all(request.as_bytes()).unwrap();
-
-        let mut response = String::new();
-        stream.read_to_string(&mut response).unwrap();
-        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+        let (status, response) = post_https(port, "/api/localsend/v2/register", &body);
+        assert_eq!(status, 200, "{}", String::from_utf8_lossy(&response));
+        let response = String::from_utf8(response).unwrap();
         assert!(response.contains(r#""alias":"LiquidSend Test""#));
         assert!(response.contains(r#""deviceModel":"Test Mac""#));
         assert!(discovery::devices_json().contains(r#""alias":"Client""#));
+    }
+
+    #[test]
+    fn ffi_receiver_rejects_an_invalid_pin() {
+        let _test_guard = ffi_test_lock();
+        let port = {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let alias = CString::new("LiquidSend Test").unwrap();
+        let model = CString::new("Test Mac").unwrap();
+        let token = CString::new("test-token").unwrap();
+        let pin = CString::new("123456").unwrap();
+        assert_eq!(localsendcore_set_receive_pin(pin.as_ptr()), 0);
+        assert_eq!(
+            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr()),
+            0
+        );
+        let _guard = ServerGuard;
+
+        let body = r#"{"info":{"alias":"Sender","version":"2.1","deviceModel":"Mac","deviceType":"desktop","fingerprint":"sender-token","port":53317,"protocol":"http","download":false},"files":{"file-1":{"id":"file-1","fileName":"hello.txt","size":5,"fileType":"text/plain"}}}"#;
+        let (status, _) = post_https(port, "/api/localsend/v2/prepare-upload?pin=wrong", body);
+        assert_eq!(status, 401);
     }
 
     #[test]
@@ -845,6 +1026,236 @@ mod tests {
     }
 
     #[test]
+    fn ffi_cancels_send_while_waiting_for_acceptance() {
+        let _test_guard = ffi_test_lock();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (prepared_tx, prepared_rx) = std::sync::mpsc::sync_channel(1);
+
+        let server = std::thread::spawn(move || {
+            let (mut prepare_stream, _) = listener.accept().unwrap();
+            let (request_line, _) = read_http_request(&mut prepare_stream);
+            assert!(request_line.contains("/api/localsend/v2/prepare-upload"));
+            prepared_tx.send(()).unwrap();
+
+            let (mut cancel_stream, _) = listener.accept().unwrap();
+            let (request_line, _) = read_http_request(&mut cancel_stream);
+            assert!(request_line.contains("/api/localsend/v2/cancel"));
+            write_http_response(&mut cancel_stream, 200, "");
+        });
+
+        let file_path = std::env::temp_dir().join(format!(
+            "localsendcore-cancel-test-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&file_path, b"cancel me").unwrap();
+        let send_path = file_path.clone();
+        let sender = std::thread::spawn(move || {
+            let target_ip = CString::new("127.0.0.1").unwrap();
+            let target_protocol = CString::new("http").unwrap();
+            let alias = CString::new("LiquidSend Test").unwrap();
+            let model = CString::new("Test Mac").unwrap();
+            let token = CString::new("sender-token").unwrap();
+            let path = CString::new(send_path.to_string_lossy().as_bytes()).unwrap();
+            let name = CString::new("cancel.txt").unwrap();
+            let mime = CString::new("text/plain").unwrap();
+            localsendcore_send_file(
+                target_ip.as_ptr(),
+                port,
+                target_protocol.as_ptr(),
+                alias.as_ptr(),
+                53317,
+                model.as_ptr(),
+                1,
+                token.as_ptr(),
+                path.as_ptr(),
+                name.as_ptr(),
+                mime.as_ptr(),
+            )
+        });
+
+        prepared_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        localsendcore_cancel_send();
+        assert_ne!(sender.join().unwrap(), 0);
+        server.join().unwrap();
+        assert_eq!(
+            send_progress()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .status,
+            "canceled"
+        );
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn ffi_sends_and_receives_file_over_https() {
+        let _test_guard = ffi_test_lock();
+        let port = {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let receive_directory = std::env::temp_dir().join(format!(
+            "localsendcore-https-receive-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        receive::set_directory(receive_directory.to_string_lossy().into_owned()).unwrap();
+        receive::set_pin(None);
+        let alias = CString::new("Filz HTTPS Receiver").unwrap();
+        let model = CString::new("Test Mac").unwrap();
+        let token = CString::new("https-receiver-token").unwrap();
+        assert_eq!(
+            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr()),
+            0
+        );
+        let _guard = ServerGuard;
+
+        let source_path = std::env::temp_dir().join(format!(
+            "localsendcore-https-send-test-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&source_path, b"encrypted transfer").unwrap();
+        let sender_path = source_path.clone();
+        let sender = std::thread::spawn(move || {
+            let target_ip = CString::new("127.0.0.1").unwrap();
+            let target_protocol = CString::new("https").unwrap();
+            let alias = CString::new("Filz HTTPS Sender").unwrap();
+            let model = CString::new("Test Mac").unwrap();
+            let token = CString::new("https-sender-token").unwrap();
+            let path = CString::new(sender_path.to_string_lossy().as_bytes()).unwrap();
+            let name = CString::new("encrypted.txt").unwrap();
+            let mime = CString::new("text/plain").unwrap();
+            localsendcore_send_file(
+                target_ip.as_ptr(),
+                port,
+                target_protocol.as_ptr(),
+                alias.as_ptr(),
+                port,
+                model.as_ptr(),
+                1,
+                token.as_ptr(),
+                path.as_ptr(),
+                name.as_ptr(),
+                mime.as_ptr(),
+            )
+        });
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let request_id = loop {
+            let pending: serde_json::Value =
+                serde_json::from_str(&receive::pending_json()).unwrap();
+            if let Some(id) = pending.get("id").and_then(serde_json::Value::as_str) {
+                assert_eq!(
+                    pending["senderFingerprint"].as_str().map(str::len),
+                    Some(64)
+                );
+                break id.to_string();
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "HTTPS receive request timed out"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        receive::decide(&request_id, true).unwrap();
+        let result = sender.join().unwrap();
+        let error = last_error()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .to_string_lossy()
+            .into_owned();
+        assert_eq!(result, 0, "{error}");
+        assert_eq!(
+            std::fs::read(receive_directory.join("encrypted.txt")).unwrap(),
+            b"encrypted transfer"
+        );
+        let _ = std::fs::remove_file(source_path);
+        let _ = std::fs::remove_dir_all(receive_directory);
+    }
+
+    #[test]
+    fn ffi_accepts_v1_transfer_over_https() {
+        let _test_guard = ffi_test_lock();
+        let port = {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let receive_directory = std::env::temp_dir().join(format!(
+            "localsendcore-v1-receive-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        receive::set_directory(receive_directory.to_string_lossy().into_owned()).unwrap();
+        receive::set_pin(Some("123456".to_string()));
+        let alias = CString::new("Filz V1 Receiver").unwrap();
+        let model = CString::new("iPhone").unwrap();
+        let token = CString::new("v1-receiver-token").unwrap();
+        assert_eq!(
+            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 0, token.as_ptr()),
+            0
+        );
+        let _guard = ServerGuard;
+
+        let sender = std::thread::spawn(move || {
+            let (status, info) = get_https(port, "/api/localsend/v1/info");
+            assert_eq!(status, 200, "{}", String::from_utf8_lossy(&info));
+            let info: serde_json::Value = serde_json::from_slice(&info).unwrap();
+            assert_eq!(info["alias"], "Filz V1 Receiver");
+
+            let request = r#"{
+                "info": {
+                    "alias": "Legacy LocalSend",
+                    "deviceModel": "Desktop",
+                    "deviceType": "desktop"
+                },
+                "files": {
+                    "legacy-file": {
+                        "id": "legacy-file",
+                        "fileName": "legacy.txt",
+                        "size": 16,
+                        "fileType": "text"
+                    }
+                }
+            }"#;
+            let (status, response) =
+                post_https(port, "/api/localsend/v1/send-request?pin=123456", request);
+            assert_eq!(status, 200, "{}", String::from_utf8_lossy(&response));
+            let tokens: std::collections::HashMap<String, String> =
+                serde_json::from_slice(&response).unwrap();
+            let path = format!(
+                "/api/localsend/v1/send?fileId=legacy-file&token={}",
+                tokens.get("legacy-file").unwrap()
+            );
+            let (status, response) =
+                post_https_bytes(port, &path, b"legacy transfer!", "application/octet-stream");
+            assert_eq!(status, 200, "{}", String::from_utf8_lossy(&response));
+        });
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let request_id = loop {
+            if let Some(id) = serde_json::from_str::<serde_json::Value>(&receive::pending_json())
+                .unwrap()
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+            {
+                break id.to_string();
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "v1 receive request timed out"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        receive::decide(&request_id, true).unwrap();
+        assert_eq!(receive::pending_json(), "null");
+        sender.join().unwrap();
+        assert_eq!(
+            std::fs::read(receive_directory.join("legacy.txt")).unwrap(),
+            b"legacy transfer!"
+        );
+        let _ = std::fs::remove_dir_all(receive_directory);
+    }
+
+    #[test]
     fn ffi_receives_file_after_user_accepts() {
         let _test_guard = ffi_test_lock();
         let port = {
@@ -867,29 +1278,18 @@ mod tests {
 
         let sender = std::thread::spawn(move || {
             let body = r#"{"info":{"alias":"Sender","version":"2.1","deviceModel":"Mac","deviceType":"desktop","fingerprint":"sender-token","port":53317,"protocol":"http","download":false},"files":{"file-1":{"id":"file-1","fileName":"hello.txt","size":14,"fileType":"text/plain"}}}"#;
-            let request = format!(
-                "POST /api/localsend/v2/prepare-upload HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-            stream.write_all(request.as_bytes()).unwrap();
-            let response = read_http_response(&mut stream);
-            assert!(response.0.starts_with("HTTP/1.1 200 OK"), "{}", response.0);
+            let (status, response) = post_https(port, "/api/localsend/v2/prepare-upload", body);
+            assert_eq!(status, 200, "{}", String::from_utf8_lossy(&response));
             let prepared: crate::http::dto::PrepareUploadResponseDto =
-                serde_json::from_slice(&response.1).unwrap();
+                serde_json::from_slice(&response).unwrap();
             let upload_token = prepared.files.get("file-1").unwrap();
             let upload_body = b"hello receiver";
-            let upload_request = format!(
-                "POST /api/localsend/v2/upload?sessionId={}&fileId=file-1&token={} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                prepared.session_id,
-                upload_token,
-                upload_body.len()
+            let path = format!(
+                "/api/localsend/v2/upload?sessionId={}&fileId=file-1&token={}",
+                prepared.session_id, upload_token
             );
-            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-            stream.write_all(upload_request.as_bytes()).unwrap();
-            stream.write_all(upload_body).unwrap();
-            let response = read_http_response(&mut stream);
-            assert!(response.0.starts_with("HTTP/1.1 200 OK"), "{}", response.0);
+            let (status, response) = post_https_bytes(port, &path, upload_body, "text/plain");
+            assert_eq!(status, 200, "{}", String::from_utf8_lossy(&response));
         });
 
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
@@ -952,6 +1352,72 @@ mod tests {
         )
     }
 
+    fn post_https(port: u16, path: &str, body: &str) -> (u16, Vec<u8>) {
+        post_https_bytes(port, path, body.as_bytes(), "application/json")
+    }
+
+    fn get_https(port: u16, path: &str) -> (u16, Vec<u8>) {
+        let identity = tls_identity::current().unwrap();
+        let identity_pem = [
+            identity.cert.as_bytes(),
+            b"\n",
+            identity.private_key.as_bytes(),
+        ]
+        .concat();
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .danger_accept_invalid_certs(true)
+            .identity(reqwest::Identity::from_pem(&identity_pem).unwrap())
+            .build()
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let response = client
+                .get(format!("https://127.0.0.1:{port}{path}"))
+                .send()
+                .await
+                .unwrap();
+            let status = response.status().as_u16();
+            let body = response.bytes().await.unwrap().to_vec();
+            (status, body)
+        })
+    }
+
+    fn post_https_bytes(port: u16, path: &str, body: &[u8], content_type: &str) -> (u16, Vec<u8>) {
+        let identity = tls_identity::current().unwrap();
+        let identity_pem = [
+            identity.cert.as_bytes(),
+            b"\n",
+            identity.private_key.as_bytes(),
+        ]
+        .concat();
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .danger_accept_invalid_certs(true)
+            .identity(reqwest::Identity::from_pem(&identity_pem).unwrap())
+            .build()
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let response = client
+                .post(format!("https://127.0.0.1:{port}{path}"))
+                .header(reqwest::header::CONTENT_TYPE, content_type)
+                .body(body.to_vec())
+                .send()
+                .await
+                .unwrap();
+            let status = response.status().as_u16();
+            let body = response.bytes().await.unwrap().to_vec();
+            (status, body)
+        })
+    }
+
     fn write_http_response(stream: &mut TcpStream, status: u16, body: &str) {
         let reason = if status == 200 { "OK" } else { "Error" };
         write!(
@@ -961,22 +1427,5 @@ mod tests {
         )
         .unwrap();
         stream.flush().unwrap();
-    }
-
-    fn read_http_response(stream: &mut TcpStream) -> (String, Vec<u8>) {
-        stream
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .unwrap();
-        let mut response = Vec::new();
-        stream.read_to_end(&mut response).unwrap();
-        let header_end = response
-            .windows(4)
-            .position(|part| part == b"\r\n\r\n")
-            .map(|index| index + 4)
-            .unwrap();
-        (
-            String::from_utf8(response[..header_end].to_vec()).unwrap(),
-            response[header_end..].to_vec(),
-        )
     }
 }

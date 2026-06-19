@@ -1,3 +1,4 @@
+mod server_cert_verifier;
 mod url;
 
 use crate::http;
@@ -15,6 +16,24 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 
 const BASE_PATH: &str = "/api/localsend/v3";
+
+pub(crate) fn local_send_tls_config(
+    private_key: &str,
+    cert: &str,
+) -> anyhow::Result<rustls::ClientConfig> {
+    use rustls::pki_types::pem::PemObject;
+    use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+
+    let verifier = Arc::new(server_cert_verifier::LocalSendServerCertVerifier::try_new(
+        cert,
+    )?);
+    let certs = vec![CertificateDer::from_pem_slice(cert.as_bytes())?];
+    let private_key = PrivateKeyDer::from_pem_slice(private_key.as_bytes())?;
+    Ok(rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(verifier)
+        .with_client_auth_cert(certs, private_key)?)
+}
 
 pub struct LsHttpClient {
     client: reqwest::Client,

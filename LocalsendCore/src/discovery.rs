@@ -198,7 +198,7 @@ fn multicast_payload(info: &ClientInfo, port: u16, announcement: bool) -> anyhow
         "deviceType": device_type,
         "fingerprint": info.token,
         "port": port,
-        "protocol": "http",
+        "protocol": "https",
         "download": false,
         "announcement": announcement,
         "announce": announcement
