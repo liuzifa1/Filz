@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support | Filz!</title>
+  <meta name="description" content="Support page for Filz!, a native LocalSend-compatible file transfer app for iOS.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f9fb;
+      --surface: #ffffff;
+      --text: #14212b;
+      --muted: #5d6b78;
+      --line: #dbe3ea;
+      --accent: #0f7b6c;
+      --accent-strong: #095c51;
+      --shadow: 0 18px 50px rgba(17, 35, 48, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1418;
+        --surface: #151c22;
+        --text: #edf3f7;
+        --muted: #a7b4be;
+        --line: #29343d;
+        --accent: #5bd2c3;
+        --accent-strong: #8be4d9;
+        --shadow: none;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 17px;
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent-strong);
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.18em;
+    }
+
+    .page {
+      width: min(100%, 920px);
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+
+    header {
+      padding: 24px 0 28px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 48px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      color: var(--accent-strong);
+    }
+
+    .brand {
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2.2rem, 8vw, 4.8rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      max-width: 720px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 1.15rem;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+    }
+
+    section {
+      padding: 28px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.25rem;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 18px 0 6px;
+      font-size: 1rem;
+      line-height: 1.35;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    ol,
+    ul {
+      margin: 12px 0 0;
+      padding-left: 1.2rem;
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    .highlight {
+      border-color: rgba(15, 123, 108, 0.34);
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    footer {
+      margin-top: 34px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 720px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 22px 16px 42px;
+      }
+
+      nav {
+        margin-bottom: 34px;
+      }
+
+      section {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <nav aria-label="Page navigation">
+        <a class="brand" href="support.html">Filz!</a>
+        <a href="privacy-policy.html">Privacy Policy</a>
+      </nav>
+      <h1>Support</h1>
+      <p class="intro">Help for Filz!, a native LocalSend-compatible file transfer app for iPhone and iPad.</p>
+    </header>
+
+    <main>
+      <section class="highlight" aria-labelledby="quick-help">
+        <h2 id="quick-help">Quick Help</h2>
+        <p>Most transfer issues are caused by local network permissions, Wi-Fi isolation, or the receiving device not being visible on the same network.</p>
+        <ol>
+          <li>Make sure both devices are connected to the same local network.</li>
+          <li>Allow Local Network access for Filz! in iOS Settings.</li>
+          <li>Open Filz! on the receiving device and keep it awake during discovery.</li>
+          <li>If discovery fails, use the app's option to add a client by IP address.</li>
+        </ol>
+      </section>
+
+      <div class="grid">
+        <section aria-labelledby="sending">
+          <h2 id="sending">Sending Files</h2>
+          <p>Use the Send tab to select files, photos, videos, or text. Choose a nearby LocalSend-compatible device when it appears, then confirm the transfer on the receiving device if required.</p>
+        </section>
+
+        <section aria-labelledby="receiving">
+          <h2 id="receiving">Receiving Files</h2>
+          <p>Keep Filz! open while receiving. Received files can be opened from the app and saved to Files. If Save media to gallery is enabled, supported photos and videos can be saved to Photos.</p>
+        </section>
+      </div>
+
+      <section aria-labelledby="troubleshooting">
+        <h2 id="troubleshooting">Troubleshooting</h2>
+
+        <h3>Nearby devices do not appear</h3>
+        <ul>
+          <li>Confirm both devices are on the same Wi-Fi or local network.</li>
+          <li>Disable VPN, Private Relay, guest Wi-Fi isolation, or firewall rules that block local device discovery.</li>
+          <li>Restart the Filz! server from Settings, then try discovery again.</li>
+        </ul>
+
+        <h3>Transfers fail or stop</h3>
+        <ul>
+          <li>Keep both devices awake until the transfer completes.</li>
+          <li>Move both devices closer to the router or use a more stable network.</li>
+          <li>Try sending a smaller file first to confirm that discovery and transfer are working.</li>
+        </ul>
+
+        <h3>Received media is not in Photos</h3>
+        <ul>
+          <li>Enable Save media to gallery in Filz! Settings.</li>
+          <li>Allow Filz! permission to add items to your Photo Library.</li>
+          <li>Check the Files app if the item was received as a document instead of gallery media.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="privacy">
+        <h2 id="privacy">Privacy</h2>
+        <p>Filz! does not collect, sell, share, or track user data. Files and text are transferred directly between devices on your local network. Read the full <a href="privacy-policy.html">Privacy Policy</a>.</p>
+      </section>
+
+      <section aria-labelledby="contact">
+        <h2 id="contact">Contact</h2>
+        <p>If you still need help, contact the app developer through the support channel where you received Filz! Include your iOS version, Filz! version, device model, and a short description of what happened.</p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Last updated: July 8, 2026</p>
+    </footer>
+  </div>
+</body>
+</html>

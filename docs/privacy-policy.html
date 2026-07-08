@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy | Filz!</title>
+  <meta name="description" content="Privacy policy for Filz!, a native LocalSend-compatible file transfer app for iOS.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f9fb;
+      --surface: #ffffff;
+      --text: #14212b;
+      --muted: #5d6b78;
+      --line: #dbe3ea;
+      --accent: #0f7b6c;
+      --accent-strong: #095c51;
+      --shadow: 0 18px 50px rgba(17, 35, 48, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1418;
+        --surface: #151c22;
+        --text: #edf3f7;
+        --muted: #a7b4be;
+        --line: #29343d;
+        --accent: #5bd2c3;
+        --accent-strong: #8be4d9;
+        --shadow: none;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 17px;
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent-strong);
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.18em;
+    }
+
+    .page {
+      width: min(100%, 920px);
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+
+    header {
+      padding: 24px 0 28px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 48px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      color: var(--accent-strong);
+    }
+
+    .brand {
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2.2rem, 8vw, 4.8rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      max-width: 720px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 1.15rem;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+    }
+
+    section {
+      padding: 28px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.25rem;
+      line-height: 1.25;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    ul {
+      margin: 12px 0 0;
+      padding-left: 1.2rem;
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    .highlight {
+      border-color: rgba(15, 123, 108, 0.34);
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
+
+    footer {
+      margin-top: 34px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 22px 16px 42px;
+      }
+
+      nav {
+        margin-bottom: 34px;
+      }
+
+      section {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <nav aria-label="Page navigation">
+        <a class="brand" href="privacy-policy.html">Filz!</a>
+        <a href="support.html">Support</a>
+      </nav>
+      <h1>Privacy Policy</h1>
+      <p class="intro">Filz! is designed for local file transfer. Your files stay between your devices, and the app does not collect, sell, share, or track user data.</p>
+    </header>
+
+    <main>
+      <section class="highlight" aria-labelledby="privacy-summary">
+        <h2 id="privacy-summary">Summary</h2>
+        <p>Filz! has no analytics, advertising SDKs, third-party tracking, or Filz! cloud account system. The app uses local device storage and local network connections only as needed to provide file and text transfers.</p>
+      </section>
+
+      <section aria-labelledby="local-data">
+        <h2 id="local-data">Data Stored on This Device</h2>
+        <p>Settings, favourite devices, transfer history, and draft shared files are stored locally on your device.</p>
+        <ul>
+          <li>Transfer history is optional and can be turned off or deleted from Settings.</li>
+          <li>Files shared to Filz! are kept only as needed to prepare and send the transfer.</li>
+          <li>Filz! does not operate a cloud service for storing your files.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="transfers">
+        <h2 id="transfers">Transfers</h2>
+        <p>Files and text are transferred directly between devices on your local network. Filz! does not upload your files to a cloud service or route them through a Filz! server.</p>
+        <p>Nearby device names, addresses, and transfer metadata are used only to discover devices and complete transfers with LocalSend-compatible devices.</p>
+      </section>
+
+      <section aria-labelledby="permissions">
+        <h2 id="permissions">Permissions</h2>
+        <ul>
+          <li><strong>Local Network:</strong> used to discover and communicate with nearby LocalSend-compatible devices.</li>
+          <li><strong>Photo Library Add Access:</strong> used only when you choose to save received photos or videos to your gallery.</li>
+          <li><strong>File Access:</strong> used only for files you select, receive, or share into the app.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="third-parties">
+        <h2 id="third-parties">Third-Party Services</h2>
+        <p>Filz! is built on LocalSend-compatible transfer technology and open source components. These components run as part of the app and are not used to track you.</p>
+      </section>
+
+      <section aria-labelledby="contact">
+        <h2 id="contact">Contact</h2>
+        <p>If you have privacy questions, contact the app developer through the support channel where you received Filz! You can also visit the <a href="support.html">Filz! Support</a> page for troubleshooting information.</p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Last updated: July 8, 2026</p>
+    </footer>
+  </div>
+</body>
+</html>

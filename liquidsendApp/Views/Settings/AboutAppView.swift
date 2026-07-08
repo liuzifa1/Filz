@@ -20,8 +20,13 @@ struct AboutAppView: View {
                     Text("Filz!")
                         .font(.headline)
                 }
-                Text("Filz aims to provide a native LocalSend experience on iOS. Thanks to the hard work of the LocalSend team, this app wouldn't be possible without the incredible foundation they laid.")
+                Text("Filz is a open source project aims to provide a native LocalSend experience on iOS.")
                     .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("you can find its source code at")
+                        .foregroundStyle(.secondary)
+                    Link("here", destination: URL(string: "https://github.com/liuzifa1/Filz")!)
+                }
                 }
         }
         .navigationTitle("Filz!")

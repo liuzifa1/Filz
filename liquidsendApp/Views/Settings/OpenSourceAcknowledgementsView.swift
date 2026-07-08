@@ -14,7 +14,7 @@ struct OpenSourceAcknowledgementsView: View {
     var body: some View {
         List {
             Section {
-                Text("Filz! is built with open source software. Thanks to the maintainers and contributors whose work makes local, device-to-device transfer possible.")
+                Text("Filz! is a and built with open source software. This app would not have been possible without the hard work of the LocalSend team and the many open source maintainers whose projects helped lay its foundation.")
                     .foregroundStyle(.secondary)
             }
 

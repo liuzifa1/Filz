@@ -45,7 +45,7 @@
 			<string>top.kitsune.filz</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>liquidsend</string>
+				<string>filz</string>
 			</array>
 		</dict>
 	</array>
