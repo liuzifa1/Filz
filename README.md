@@ -56,6 +56,7 @@ See the full privacy policy in `docs/privacy-policy.html`.
 ## Relationship To LocalSend
 
 Filz! is built on top of the LocalSend core. This app would not have been possible without the hard work of the LocalSend team and the many open source maintainers whose projects helped lay its foundation.
+And u can find orignal repo at https://github.com/localsend/localsend
 
 ## License
 
