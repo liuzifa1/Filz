@@ -36,6 +36,14 @@ enum SharedAttachmentInbox {
     }
 
     static func importPendingShare() -> SharedAttachmentImport {
+        guard hasPendingShare else {
+            return SharedAttachmentImport(
+                urls: [],
+                textPreviews: [:],
+                selectedFavouriteIDs: [],
+                openDestinationPicker: false
+            )
+        }
         let selection = consumeShareSelection()
         let manifest = consumeShareManifest()
         let movedItems = movePendingItems(manifest: manifest)
@@ -68,10 +76,6 @@ enum SharedAttachmentInbox {
         if let data = try? JSONEncoder().encode(snapshots) {
             try? data.write(to: url, options: .atomic)
         }
-    }
-
-    private static func movePendingFiles() -> [URL] {
-        movePendingItems(manifest: consumeShareManifest()).map(\.url)
     }
 
     private static func movePendingItems(manifest: ShareManifest) -> [(url: URL, textPreview: String?)] {
@@ -132,16 +136,20 @@ enum SharedAttachmentInbox {
             return []
         }
 
-        let textPreviewsByName = manifest.items.reduce(into: [String: String?]()) { result, item in
-            result[item.fileName] = item.textPreview
+        let manifestFileNames = Set(manifest.items.map(\.fileName))
+        let textPreviewsByName = manifest.items.reduce(into: [String: String]()) { result, item in
+            if let textPreview = item.textPreview {
+                result[item.fileName] = textPreview
+            }
         }
 
         return entries.compactMap { entry in
             guard (try? entry.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { return nil }
+            guard manifestFileNames.contains(entry.lastPathComponent) else { return nil }
             let target = uniqueURL(in: destination, named: entry.lastPathComponent)
             do {
                 try FileManager.default.moveItem(at: entry, to: target)
-                return (target, textPreviewsByName[entry.lastPathComponent] ?? nil)
+                return (target, textPreviewsByName[entry.lastPathComponent])
             } catch {
                 return nil
             }

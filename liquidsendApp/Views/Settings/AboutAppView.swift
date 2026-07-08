@@ -17,7 +17,7 @@ struct AboutAppView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width:200)
-                    Text("What is Filz!")
+                    Text("Filz!")
                         .font(.headline)
                 }
                 Text("Filz aims to provide a native LocalSend experience on iOS. Thanks to the hard work of the LocalSend team, this app wouldn't be possible without the incredible foundation they laid.")

@@ -176,6 +176,9 @@ struct SettingsFormView: View {
                 NavigationLink("About Filz!") {
                     AboutAppView()
                 }
+                NavigationLink("Privacy Policy") {
+                    PrivacyPolicyView()
+                }
                 NavigationLink("Open Source Acknowledgements") {
                     OpenSourceAcknowledgementsView()
                 }
