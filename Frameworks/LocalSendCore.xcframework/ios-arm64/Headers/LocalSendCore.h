@@ -6,6 +6,7 @@
 const char *localsendcore_version(void);
 bool localsendcore_is_available(void);
 const char *localsendcore_last_error(void);
+void localsendcore_clear_last_error(void);
 void localsendcore_string_free(char *pointer);
 char *localsendcore_discovered_devices_json(void);
 void localsendcore_refresh_discovery(void);
@@ -26,6 +27,7 @@ int32_t localsendcore_send_files_json(
     const char *target_pin,
     const char *sender_alias,
     uint16_t sender_port,
+    const char *sender_protocol,
     const char *sender_device_model,
     uint8_t sender_device_type,
     const char *sender_token,
@@ -49,7 +51,8 @@ int32_t localsendcore_start_server(
     const char *alias,
     const char *device_model,
     uint8_t device_type,
-    const char *token
+    const char *token,
+    bool use_tls
 );
 void localsendcore_stop_server(void);
 bool localsendcore_is_server_running(void);

@@ -6,6 +6,7 @@ use hyper::body::Incoming;
 use hyper::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -19,6 +20,7 @@ pub struct IncomingFile {
     pub file_name: String,
     pub size: u64,
     pub file_type: String,
+    pub preview: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -52,6 +54,8 @@ pub struct ReceiveProgress {
     pub completed_files: usize,
     pub total_files: usize,
     pub saved_paths: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_message: Option<String>,
     pub error: Option<String>,
 }
 
@@ -67,6 +71,7 @@ struct ActiveFile {
     file: FileDto,
     token: String,
     received: u64,
+    receiving: bool,
     finished: bool,
     path: Option<PathBuf>,
 }
@@ -281,17 +286,42 @@ async fn prepare_payload(
     }
 
     let request_id = uuid::Uuid::new_v4().to_string();
+    let sender_token = payload.info.token.clone();
     let sender_fingerprint = sender_fingerprint
         .filter(|fingerprint| !fingerprint.is_empty())
-        .unwrap_or_else(|| payload.info.token.clone());
+        .unwrap_or_else(|| sender_token.clone());
     let total_bytes = payload.files.values().map(|file| file.size).sum();
+    let text_message = text_message(&payload.files);
+    if let Some(message) = text_message {
+        let mut state = lock_manager();
+        if state.pending.is_some() || state.active.is_some() {
+            return error_response(StatusCode::CONFLICT, "Blocked by another session");
+        }
+        state.progress = ReceiveProgress {
+            request_id: Some(request_id),
+            status: "finished".to_string(),
+            started_at_millis: Some(unix_time_millis()),
+            sender_alias: payload.info.alias,
+            sender_ip: Some(sender_ip.to_string()),
+            sender_port: (payload.info.port != 0).then_some(payload.info.port),
+            sender_protocol: Some(payload.info.protocol.as_str().to_string()),
+            sender_fingerprint: Some(sender_fingerprint),
+            received_bytes: total_bytes,
+            total_bytes,
+            completed_files: payload.files.len(),
+            total_files: payload.files.len(),
+            text_message: Some(message),
+            ..ReceiveProgress::default()
+        };
+        return empty_response(StatusCode::NO_CONTENT);
+    }
     let public = IncomingRequest {
         id: request_id.clone(),
         sender_alias: payload.info.alias.clone(),
         sender_ip: sender_ip.to_string(),
         sender_port: payload.info.port,
         sender_protocol: payload.info.protocol.as_str().to_string(),
-        sender_token: sender_fingerprint.clone(),
+        sender_token,
         sender_fingerprint: sender_fingerprint.clone(),
         files: payload
             .files
@@ -301,6 +331,7 @@ async fn prepare_payload(
                 file_name: file.file_name.clone(),
                 size: file.size,
                 file_type: file.file_type.clone(),
+                preview: file.preview.clone(),
             })
             .collect(),
         total_bytes,
@@ -362,6 +393,7 @@ async fn prepare_payload(
                 file,
                 token,
                 received: 0,
+                receiving: false,
                 finished: false,
                 path: None,
             },
@@ -440,8 +472,9 @@ async fn upload_inner(
     token: &str,
 ) -> Response<Full<Bytes>> {
     let (directory, file_name, expected_size) = {
-        let state = lock_manager();
-        let Some(session) = state.active.as_ref() else {
+        let mut state = lock_manager();
+        let directory = state.directory.clone();
+        let Some(session) = state.active.as_mut() else {
             return error_response(StatusCode::CONFLICT, "No session");
         };
         if session.sender_ip != sender_ip
@@ -449,14 +482,15 @@ async fn upload_inner(
         {
             return error_response(StatusCode::FORBIDDEN, "Invalid session");
         }
-        let Some(file) = session.files.get(file_id) else {
+        let Some(file) = session.files.get_mut(file_id) else {
             return error_response(StatusCode::FORBIDDEN, "Invalid file id");
         };
-        if file.token != token || file.finished {
+        if file.token != token || file.finished || file.receiving {
             return error_response(StatusCode::FORBIDDEN, "Invalid token");
         }
+        file.receiving = true;
         (
-            state.directory.clone(),
+            directory,
             safe_file_name(&file.file.file_name),
             file.file.size,
         )
@@ -465,8 +499,7 @@ async fn upload_inner(
     if let Err(error) = tokio::fs::create_dir_all(&directory).await {
         return finish_with_error(format!("Could not create receive directory: {error}"));
     }
-    let destination = unique_path(&directory, &file_name).await;
-    let mut output = match tokio::fs::File::create(&destination).await {
+    let (destination, mut output) = match create_unique_file(&directory, &file_name).await {
         Ok(file) => file,
         Err(error) => return finish_with_error(format!("Could not create received file: {error}")),
     };
@@ -474,11 +507,21 @@ async fn upload_inner(
     while let Some(frame) = body.frame().await {
         let frame = match frame {
             Ok(frame) => frame,
-            Err(error) => return finish_with_error(format!("Upload interrupted: {error}")),
+            Err(error) => {
+                return finish_upload_with_error(
+                    &destination,
+                    format!("Upload interrupted: {error}"),
+                )
+                .await
+            }
         };
         if let Some(data) = frame.data_ref() {
             if let Err(error) = output.write_all(data).await {
-                return finish_with_error(format!("Could not save received file: {error}"));
+                return finish_upload_with_error(
+                    &destination,
+                    format!("Could not save received file: {error}"),
+                )
+                .await;
             }
             let mut state = lock_manager();
             if let Some(session) = state.active.as_mut() {
@@ -491,58 +534,101 @@ async fn upload_inner(
         }
     }
     if let Err(error) = output.flush().await {
-        return finish_with_error(format!("Could not finish received file: {error}"));
+        return finish_upload_with_error(
+            &destination,
+            format!("Could not finish received file: {error}"),
+        )
+        .await;
     }
 
-    let mut state = lock_manager();
-    let (actual_size, all_finished) = {
-        let Some(session) = state.active.as_mut() else {
-            return error_response(StatusCode::CONFLICT, "Session was canceled");
-        };
-        let Some(file) = session.files.get_mut(file_id) else {
-            return error_response(StatusCode::FORBIDDEN, "Invalid file id");
-        };
-        let actual_size = file.received;
-        if actual_size == expected_size {
-            file.finished = true;
-            file.path = Some(destination.clone());
+    enum UploadFinalization {
+        Finished,
+        Failed(String),
+        Canceled,
+        InvalidFileId,
+    }
+
+    let finalization = {
+        let mut state = lock_manager();
+
+        if state.active.is_none() {
+            UploadFinalization::Canceled
+        } else {
+            let file_result = {
+                let session = state.active.as_mut().expect("active session checked");
+                match session.files.get_mut(file_id) {
+                    Some(file) => {
+                        let actual_size = file.received;
+                        if actual_size == expected_size {
+                            file.finished = true;
+                            file.path = Some(destination.clone());
+                        }
+                        Some((
+                            actual_size,
+                            session.files.values().all(|file| file.finished),
+                        ))
+                    }
+                    None => None,
+                }
+            };
+
+            match file_result {
+                Some((actual_size, all_finished)) if actual_size != expected_size => {
+                    let message =
+                        format!("Expected {expected_size} bytes but received {actual_size}");
+                    state.progress.status = "failed".to_string();
+                    state.progress.error = Some(message.clone());
+                    state.active = None;
+                    UploadFinalization::Failed(message)
+                }
+                Some((_, all_finished)) => {
+                    state.progress.completed_files += 1;
+                    state
+                        .progress
+                        .saved_paths
+                        .push(destination.to_string_lossy().into_owned());
+                    if all_finished {
+                        state.progress.status = "finished".to_string();
+                        state.progress.current_file = None;
+                        state.active = None;
+                    }
+                    UploadFinalization::Finished
+                }
+                None => UploadFinalization::InvalidFileId,
+            }
         }
-        (
-            actual_size,
-            session.files.values().all(|file| file.finished),
-        )
     };
-    if actual_size != expected_size {
-        let message = format!("Expected {expected_size} bytes but received {actual_size}");
-        state.progress.status = "failed".to_string();
-        state.progress.error = Some(message.clone());
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, &message);
+
+    match finalization {
+        UploadFinalization::Finished => empty_response(StatusCode::OK),
+        UploadFinalization::Failed(message) => {
+            let _ = tokio::fs::remove_file(&destination).await;
+            error_response(StatusCode::INTERNAL_SERVER_ERROR, &message)
+        }
+        UploadFinalization::Canceled => {
+            let _ = tokio::fs::remove_file(&destination).await;
+            error_response(StatusCode::CONFLICT, "Session was canceled")
+        }
+        UploadFinalization::InvalidFileId => {
+            let _ = tokio::fs::remove_file(&destination).await;
+            error_response(StatusCode::FORBIDDEN, "Invalid file id")
+        }
     }
-    state.progress.completed_files += 1;
-    state
-        .progress
-        .saved_paths
-        .push(destination.to_string_lossy().into_owned());
-    if all_finished {
-        state.progress.status = "finished".to_string();
-        state.progress.current_file = None;
-        state.active = None;
-    }
-    empty_response(StatusCode::OK)
 }
 
 pub fn cancel(sender_ip: IpAddr, session_id: Option<&str>) -> Response<Full<Bytes>> {
     let mut state = lock_manager();
     if let Some(pending) = state.pending.as_ref() {
         if pending.sender_ip == sender_ip {
-            if let Some(sender) = state
-                .pending
-                .as_mut()
-                .and_then(|pending| pending.decision.take())
-            {
-                let _ = sender.send(false);
+            if let Some(mut pending) = state.pending.take() {
+                let sender = pending.decision.take();
+                state.progress.status = "canceled".to_string();
+                if let Some(sender) = sender {
+                    let _ = sender.send(false);
+                }
+            } else {
+                state.progress.status = "canceled".to_string();
             }
-            state.progress.status = "canceled".to_string();
             return empty_response(StatusCode::OK);
         }
     }
@@ -558,20 +644,22 @@ pub fn cancel(sender_ip: IpAddr, session_id: Option<&str>) -> Response<Full<Byte
     error_response(StatusCode::FORBIDDEN, "No permission")
 }
 
-fn safe_file_name(name: &str) -> String {
-    Path::new(name)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
-        .unwrap_or("received-file")
-        .to_string()
-}
-
-async fn unique_path(directory: &Path, file_name: &str) -> PathBuf {
+async fn create_unique_file(
+    directory: &Path,
+    file_name: &str,
+) -> std::io::Result<(PathBuf, tokio::fs::File)> {
     let initial = directory.join(file_name);
-    if tokio::fs::metadata(&initial).await.is_err() {
-        return initial;
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&initial)
+        .await
+    {
+        Ok(file) => return Ok((initial, file)),
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
     }
+
     let path = Path::new(file_name);
     let stem = path
         .file_stem()
@@ -583,15 +671,45 @@ async fn unique_path(directory: &Path, file_name: &str) -> PathBuf {
             Some(extension) => directory.join(format!("{stem} ({index}).{extension}")),
             None => directory.join(format!("{stem} ({index})")),
         };
-        if tokio::fs::metadata(&candidate).await.is_err() {
-            return candidate;
+        match tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+            .await
+        {
+            Ok(file) => return Ok((candidate, file)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
         }
     }
-    directory.join(format!("{}-{file_name}", uuid::Uuid::new_v4()))
+
+    let candidate = directory.join(format!("{}-{file_name}", uuid::Uuid::new_v4()));
+    tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&candidate)
+        .await
+        .map(|file| (candidate, file))
+}
+
+async fn finish_upload_with_error(destination: &Path, message: String) -> Response<Full<Bytes>> {
+    let _ = tokio::fs::remove_file(destination).await;
+    finish_with_error(message)
+}
+
+fn safe_file_name(name: &str) -> String {
+    Path::new(name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .unwrap_or("received-file")
+        .to_string()
 }
 
 fn finish_with_error(message: String) -> Response<Full<Bytes>> {
     let mut state = lock_manager();
+    state.pending = None;
+    state.active = None;
     state.progress.status = "failed".to_string();
     state.progress.error = Some(message.clone());
     error_response(StatusCode::INTERNAL_SERVER_ERROR, &message)
@@ -613,6 +731,20 @@ fn error_response(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
             message: message.to_string(),
         },
     )
+}
+
+fn text_message(files: &HashMap<String, FileDto>) -> Option<String> {
+    if files.len() != 1 {
+        return None;
+    }
+    let file = files.values().next()?;
+    if !file.file_type.starts_with("text/") {
+        return None;
+    }
+    file.preview
+        .as_ref()
+        .filter(|preview| !preview.is_empty())
+        .cloned()
 }
 
 fn empty_response(status: StatusCode) -> Response<Full<Bytes>> {

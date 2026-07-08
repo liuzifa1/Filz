@@ -131,8 +131,79 @@ fn parse_protocol(value: Option<&str>) -> ProtocolType {
 pub(crate) async fn run(
     port: u16,
     info: ClientInfo,
+    protocol: ProtocolType,
     mut refresh_rx: mpsc::UnboundedReceiver<()>,
 ) -> anyhow::Result<()> {
+    let announcement = multicast_payload(&info, port, &protocol, true)?;
+    let response = multicast_payload(&info, port, &protocol, false)?;
+    let target = SocketAddrV4::new(MULTICAST_GROUP, port);
+    let mut interval = tokio::time::interval(Duration::from_secs(30));
+    let mut buffer = vec![0_u8; 64 * 1024];
+
+    loop {
+        let socket = match multicast_socket(port).await {
+            Ok(socket) => socket,
+            Err(error) => {
+                tracing::warn!("Discovery socket unavailable: {error:#}");
+                crate::set_last_error(format!(
+                    "Nearby discovery unavailable: {error}. Receiving by IP is still available."
+                ));
+                tokio::select! {
+                    Some(()) = refresh_rx.recv() => {}
+                    _ = tokio::time::sleep(Duration::from_secs(5)) => {}
+                }
+                continue;
+            }
+        };
+
+        let _ = socket.send_to(&announcement, target).await;
+        let mut consecutive_receive_errors = 0_u32;
+
+        loop {
+            tokio::select! {
+                result = socket.recv_from(&mut buffer) => {
+                    let (length, source) = match result {
+                        Ok(packet) => {
+                            consecutive_receive_errors = 0;
+                            packet
+                        }
+                        Err(error) => {
+                            tracing::warn!("Discovery receive error: {error:#}");
+                            consecutive_receive_errors += 1;
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                            if consecutive_receive_errors >= 5 {
+                                // The socket looks dead (e.g. interface went
+                                // away); rebuild it instead of retrying reads.
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                    let Ok(dto) = serde_json::from_slice::<MulticastDto>(&buffer[..length]) else {
+                        continue;
+                    };
+                    if dto.fingerprint == info.token {
+                        continue;
+                    }
+
+                    let should_answer = dto.announcement || dto.announce;
+                    record(dto.into_device(source.ip(), port));
+                    if should_answer {
+                        let _ = socket.send_to(&response, target).await;
+                    }
+                }
+                Some(()) = refresh_rx.recv() => {
+                    let _ = socket.send_to(&announcement, target).await;
+                }
+                _ = interval.tick() => {
+                    let _ = socket.send_to(&announcement, target).await;
+                }
+            }
+        }
+    }
+}
+
+async fn multicast_socket(port: u16) -> anyhow::Result<tokio::net::UdpSocket> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     #[cfg(any(
@@ -147,43 +218,15 @@ pub(crate) async fn run(
     socket.set_multicast_ttl_v4(1)?;
     socket.set_nonblocking(true)?;
 
-    let socket = tokio::net::UdpSocket::from_std(socket.into())?;
-    let announcement = multicast_payload(&info, port, true)?;
-    let response = multicast_payload(&info, port, false)?;
-    let target = SocketAddrV4::new(MULTICAST_GROUP, port);
-    let mut interval = tokio::time::interval(Duration::from_secs(30));
-    let mut buffer = vec![0_u8; 64 * 1024];
-
-    let _ = socket.send_to(&announcement, target).await;
-
-    loop {
-        tokio::select! {
-            result = socket.recv_from(&mut buffer) => {
-                let (length, source) = result?;
-                let Ok(dto) = serde_json::from_slice::<MulticastDto>(&buffer[..length]) else {
-                    continue;
-                };
-                if dto.fingerprint == info.token {
-                    continue;
-                }
-
-                let should_answer = dto.announcement || dto.announce;
-                record(dto.into_device(source.ip(), port));
-                if should_answer {
-                    let _ = socket.send_to(&response, target).await;
-                }
-            }
-            Some(()) = refresh_rx.recv() => {
-                let _ = socket.send_to(&announcement, target).await;
-            }
-            _ = interval.tick() => {
-                let _ = socket.send_to(&announcement, target).await;
-            }
-        }
-    }
+    Ok(tokio::net::UdpSocket::from_std(socket.into())?)
 }
 
-fn multicast_payload(info: &ClientInfo, port: u16, announcement: bool) -> anyhow::Result<Vec<u8>> {
+fn multicast_payload(
+    info: &ClientInfo,
+    port: u16,
+    protocol: &ProtocolType,
+    announcement: bool,
+) -> anyhow::Result<Vec<u8>> {
     let device_type = match info.device_type.as_ref().unwrap_or(&DeviceType::Mobile) {
         DeviceType::Mobile => "mobile",
         DeviceType::Desktop => "desktop",
@@ -198,7 +241,7 @@ fn multicast_payload(info: &ClientInfo, port: u16, announcement: bool) -> anyhow
         "deviceType": device_type,
         "fingerprint": info.token,
         "port": port,
-        "protocol": "https",
+        "protocol": protocol.as_str(),
         "download": false,
         "announcement": announcement,
         "announce": announcement

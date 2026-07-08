@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct IncomingReceiveRequestDetailView: View {
     let request: IncomingLocalSendRequest
@@ -33,6 +34,12 @@ struct IncomingReceiveRequestDetailView: View {
                             Text(file.fileType)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if let preview = file.preview, !preview.isEmpty {
+                                Text(preview)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(4)
+                            }
                         }
                         Spacer()
                         Text(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
@@ -89,7 +96,7 @@ struct TransferProgressDetailView: View {
                 LabeledContent("Progress", value: progress.percentText)
                 LabeledContent("Transferred", value: ByteCountFormatter.string(fromByteCount: Int64(clamping: progress.transferredBytes), countStyle: .file))
                 LabeledContent("Total", value: ByteCountFormatter.string(fromByteCount: Int64(clamping: progress.totalBytes), countStyle: .file))
-                LabeledContent("Files", value: "\(progress.completedFiles) of \(progress.totalFiles)")
+                LabeledContent("Files", value: progress.isTextMessage ? "Text" : "\(progress.completedFiles) of \(progress.totalFiles)")
                 if let speed = progress.bytesPerSecond {
                     LabeledContent(progress.status == "finished" ? "Average Speed" : "Speed", value: speedText(speed))
                 }
@@ -98,6 +105,16 @@ struct TransferProgressDetailView: View {
                 }
                 if let currentFile = progress.currentFile {
                     LabeledContent("Current", value: currentFile)
+                }
+            }
+
+            if let text = progress.textMessage, !text.isEmpty {
+                Section("Text") {
+                    Text(text)
+                        .textSelection(.enabled)
+                    Button("Copy Text", systemImage: "doc.on.doc") {
+                        UIPasteboard.general.string = text
+                    }
                 }
             }
 
@@ -112,7 +129,7 @@ struct TransferProgressDetailView: View {
                                 .lineLimit(2)
                         }
                     }
-                    Button("Open in Files", systemImage: "folder") {
+                    Button("Open in Files", systemImage: "escape") {
                         FilesLocationOpener.openReceivedFiles()
                     }
                 }

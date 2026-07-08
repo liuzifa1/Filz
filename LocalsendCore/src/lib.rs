@@ -60,6 +60,8 @@ struct SendFileInput {
     file_path: String,
     file_name: String,
     file_type: String,
+    #[serde(default)]
+    preview: Option<String>,
 }
 
 #[cfg(feature = "http")]
@@ -77,6 +79,8 @@ struct SendProgress {
     total_bytes: u64,
     completed_files: usize,
     total_files: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text_message: Option<String>,
     error: Option<String>,
 }
 
@@ -145,6 +149,11 @@ pub extern "C" fn localsendcore_last_error() -> *const c_char {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn localsendcore_clear_last_error() {
+    set_last_error("");
 }
 
 #[no_mangle]
@@ -334,9 +343,10 @@ pub extern "C" fn localsendcore_send_file(
         send_files_blocking(
             target_ip,
             target_port,
-            protocol,
+            protocol.clone(),
             sender_alias,
             sender_port,
+            protocol,
             sender_device_model,
             device_type,
             sender_token,
@@ -346,6 +356,7 @@ pub extern "C" fn localsendcore_send_file(
                 file_path,
                 file_name,
                 file_type,
+                preview: None,
             }],
         )
     })();
@@ -372,6 +383,7 @@ pub extern "C" fn localsendcore_send_files_json(
     target_pin: *const c_char,
     sender_alias: *const c_char,
     sender_port: u16,
+    sender_protocol: *const c_char,
     sender_device_model: *const c_char,
     sender_device_type: u8,
     sender_token: *const c_char,
@@ -388,6 +400,7 @@ pub extern "C" fn localsendcore_send_files_json(
             Some(read_c_string(target_pin, "target PIN")?).filter(|pin| !pin.is_empty())
         };
         let sender_alias = read_c_string(sender_alias, "sender alias")?;
+        let sender_protocol = read_c_string(sender_protocol, "sender protocol")?;
         let sender_device_model = read_c_string(sender_device_model, "sender device model")?;
         let sender_token = read_c_string(sender_token, "sender token")?;
         let files_json = read_c_string(files_json, "files JSON")?;
@@ -400,6 +413,11 @@ pub extern "C" fn localsendcore_send_files_json(
             "http" => crate::http::dto::ProtocolType::Http,
             "https" => crate::http::dto::ProtocolType::Https,
             _ => return Err(format!("unsupported protocol: {target_protocol}")),
+        };
+        let sender_protocol = match sender_protocol.to_ascii_lowercase().as_str() {
+            "http" => crate::http::dto::ProtocolType::Http,
+            "https" => crate::http::dto::ProtocolType::Https,
+            _ => return Err(format!("unsupported sender protocol: {sender_protocol}")),
         };
         let device_type = match sender_device_type {
             1 => crate::model::discovery::DeviceType::Desktop,
@@ -414,6 +432,7 @@ pub extern "C" fn localsendcore_send_files_json(
             protocol,
             sender_alias,
             sender_port,
+            sender_protocol,
             sender_device_model,
             device_type,
             sender_token,
@@ -452,6 +471,7 @@ fn send_files_blocking(
     protocol: crate::http::dto::ProtocolType,
     sender_alias: String,
     sender_port: u16,
+    sender_protocol: crate::http::dto::ProtocolType,
     sender_device_model: String,
     sender_device_type: crate::model::discovery::DeviceType,
     sender_token: String,
@@ -474,6 +494,7 @@ fn send_files_blocking(
             protocol,
             sender_alias,
             sender_port,
+            sender_protocol,
             sender_device_model,
             sender_device_type,
             sender_token,
@@ -491,6 +512,7 @@ async fn send_files_v2(
     protocol: crate::http::dto::ProtocolType,
     sender_alias: String,
     sender_port: u16,
+    sender_protocol: crate::http::dto::ProtocolType,
     sender_device_model: String,
     sender_device_type: crate::model::discovery::DeviceType,
     sender_token: String,
@@ -498,16 +520,6 @@ async fn send_files_v2(
     target_pin: Option<String>,
     files: Vec<SendFileInput>,
 ) -> anyhow::Result<()> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let tls_identity = tls_identity::current()?;
-    let client = reqwest::Client::builder()
-        .use_preconfigured_tls(crate::http::client::local_send_tls_config(
-            &tls_identity.private_key,
-            &tls_identity.cert,
-        )?)
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .timeout(std::time::Duration::from_secs(300))
-        .build()?;
     let mut prepared_files = Vec::new();
     for input in files {
         let metadata = tokio::fs::metadata(&input.file_path).await?;
@@ -516,20 +528,49 @@ async fn send_files_v2(
         }
         prepared_files.push((uuid::Uuid::new_v4().to_string(), input, metadata.len()));
     }
+    let is_text_message = prepared_files.len() == 1
+        && prepared_files.iter().all(|(_, input, _)| {
+            input
+                .preview
+                .as_ref()
+                .is_some_and(|preview| !preview.is_empty())
+                && input.file_type.starts_with("text/")
+        });
+    let text_message = is_text_message
+        .then(|| {
+            prepared_files
+                .first()
+                .and_then(|(_, input, _)| input.preview.clone())
+        })
+        .flatten();
     let total_bytes = prepared_files.iter().map(|(_, _, size)| size).sum();
     update_send_progress(|progress| {
         *progress = SendProgress {
             status: "waiting".to_string(),
             started_at_millis: Some(unix_time_millis()),
-            target_alias,
+            target_alias: target_alias.clone(),
             target_ip: target_ip.clone(),
             target_port,
             target_protocol: protocol.as_str().to_string(),
             total_bytes,
             total_files: prepared_files.len(),
+            text_message: text_message.clone(),
             ..SendProgress::default()
         };
     });
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let mut client_builder = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(300));
+    if protocol == crate::http::dto::ProtocolType::Https {
+        let tls_identity = tls_identity::current()?;
+        client_builder =
+            client_builder.use_preconfigured_tls(crate::http::client::local_send_tls_config(
+                &tls_identity.private_key,
+                &tls_identity.cert,
+            )?);
+    }
+    let client = client_builder.build()?;
     let info = crate::http::dto::RegisterDto {
         alias: sender_alias,
         version: "2.1".to_string(),
@@ -537,7 +578,7 @@ async fn send_files_v2(
         device_type: Some(sender_device_type),
         token: sender_token,
         port: sender_port,
-        protocol: crate::http::dto::ProtocolType::Https,
+        protocol: sender_protocol,
         has_web_interface: false,
     };
     let request = crate::http::dto::PrepareUploadRequestDto {
@@ -553,7 +594,7 @@ async fn send_files_v2(
                         size: *size,
                         file_type: input.file_type.clone(),
                         sha256: None,
-                        preview: None,
+                        preview: input.preview.clone(),
                         metadata: None,
                     },
                 )
@@ -573,7 +614,10 @@ async fn send_files_v2(
     }
     let prepare_request = client.post(prepare_url).json(&request).send();
     let response = tokio::select! {
-        response = prepare_request => response?,
+        response = prepare_request => match response {
+            Ok(response) => response,
+            Err(error) => return Err(error.into()),
+        },
         _ = wait_for_send_cancel() => {
             let _ = client.post(format!("{base_url}/cancel")).send().await;
             return Err(anyhow::anyhow!("Transfer canceled"));
@@ -581,6 +625,18 @@ async fn send_files_v2(
     };
 
     if response.status() == reqwest::StatusCode::NO_CONTENT {
+        // Per the LocalSend protocol, 204 means "finished — no file transfer
+        // needed": the receiver consumed the transfer during prepare-upload
+        // (our receiver's text-message shortcut). Rejection is 403.
+        update_send_progress(|progress| {
+            progress.status = "finished".to_string();
+            progress.current_file = None;
+            progress.sent_bytes = total_bytes;
+            progress.completed_files = progress.total_files;
+        });
+        return Ok(());
+    }
+    if response.status() == reqwest::StatusCode::FORBIDDEN {
         return Err(anyhow::anyhow!("The recipient did not accept the files"));
     }
     if response.status() != reqwest::StatusCode::OK {
@@ -709,6 +765,7 @@ pub extern "C" fn localsendcore_start_server(
     device_model: *const c_char,
     device_type: u8,
     token: *const c_char,
+    use_tls: bool,
 ) -> i32 {
     let alias = match read_c_string(alias, "alias") {
         Ok(value) => value,
@@ -737,12 +794,24 @@ pub extern "C" fn localsendcore_start_server(
         return -1;
     }
 
-    let tls_identity = match tls_identity::current() {
-        Ok(identity) => identity,
-        Err(error) => {
-            set_last_error(error.to_string());
-            return -1;
+    let tls_config = if use_tls {
+        match tls_identity::current() {
+            Ok(identity) => Some(crate::http::server::TlsConfig {
+                cert: identity.cert,
+                private_key: identity.private_key,
+            }),
+            Err(error) => {
+                set_last_error(error.to_string());
+                return -1;
+            }
         }
+    } else {
+        None
+    };
+    let protocol = if use_tls {
+        crate::http::dto::ProtocolType::Https
+    } else {
+        crate::http::dto::ProtocolType::Http
     };
 
     let state_mutex = SERVER_STATE.get_or_init(|| Mutex::new(ServerState::new()));
@@ -792,7 +861,9 @@ pub extern "C" fn localsendcore_start_server(
 
         let discovery_info = info.clone();
         runtime.spawn(async move {
-            if let Err(error) = crate::discovery::run(port, discovery_info, discovery_rx).await {
+            if let Err(error) =
+                crate::discovery::run(port, discovery_info, protocol, discovery_rx).await
+            {
                 set_last_error(format!(
                     "Nearby discovery unavailable: {error}. Receiving by IP is still available."
                 ));
@@ -800,15 +871,7 @@ pub extern "C" fn localsendcore_start_server(
         });
 
         if let Err(error) = runtime.block_on(crate::http::server::run_with_port_and_ready(
-            port,
-            Some(crate::http::server::TlsConfig {
-                cert: tls_identity.cert,
-                private_key: tls_identity.private_key,
-            }),
-            info,
-            true,
-            stop_rx,
-            ready_tx,
+            port, tls_config, info, true, stop_rx, ready_tx,
         )) {
             set_last_error(error.to_string());
         }
@@ -909,8 +972,14 @@ mod tests {
         let model = CString::new("Test Mac").unwrap();
         let token = CString::new("test-token").unwrap();
 
-        let result =
-            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr());
+        let result = localsendcore_start_server(
+            port,
+            alias.as_ptr(),
+            model.as_ptr(),
+            1,
+            token.as_ptr(),
+            true,
+        );
         let error = last_error()
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -944,7 +1013,14 @@ mod tests {
         let pin = CString::new("123456").unwrap();
         assert_eq!(localsendcore_set_receive_pin(pin.as_ptr()), 0);
         assert_eq!(
-            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr()),
+            localsendcore_start_server(
+                port,
+                alias.as_ptr(),
+                model.as_ptr(),
+                1,
+                token.as_ptr(),
+                true
+            ),
             0
         );
         let _guard = ServerGuard;
@@ -1022,6 +1098,78 @@ mod tests {
 
         server.join().unwrap();
         assert_eq!(&*uploaded.lock().unwrap(), b"hello from LiquidSend");
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn ffi_sends_text_message_with_preview_without_upload() {
+        let _test_guard = ffi_test_lock();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let (request_line, body) = read_http_request(&mut stream);
+            assert!(request_line.contains("/api/localsend/v2/prepare-upload"));
+            let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let file = payload["files"]
+                .as_object()
+                .unwrap()
+                .values()
+                .next()
+                .unwrap();
+            assert_eq!(file["fileType"], "text/plain");
+            assert_eq!(file["preview"], "hello world");
+            write_http_response(&mut stream, 204, "");
+        });
+
+        let file_path = std::env::temp_dir().join(format!(
+            "localsendcore-text-message-test-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&file_path, b"hello world").unwrap();
+
+        let target_ip = CString::new("127.0.0.1").unwrap();
+        let target_protocol = CString::new("http").unwrap();
+        let sender_protocol = CString::new("http").unwrap();
+        let target_alias = CString::new("LocalSend Receiver").unwrap();
+        let alias = CString::new("LiquidSend Test").unwrap();
+        let model = CString::new("Test Mac").unwrap();
+        let token = CString::new("sender-token").unwrap();
+        let files = CString::new(format!(
+            r#"[{{"filePath":"{}","fileName":"message.txt","fileType":"text/plain","preview":"hello world"}}]"#,
+            file_path.to_string_lossy()
+        ))
+        .unwrap();
+
+        let result = localsendcore_send_files_json(
+            target_ip.as_ptr(),
+            port,
+            target_protocol.as_ptr(),
+            target_alias.as_ptr(),
+            std::ptr::null(),
+            alias.as_ptr(),
+            53317,
+            sender_protocol.as_ptr(),
+            model.as_ptr(),
+            1,
+            token.as_ptr(),
+            files.as_ptr(),
+        );
+        let error = last_error()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .to_string_lossy()
+            .into_owned();
+        assert_eq!(result, 0, "{error}");
+        server.join().unwrap();
+        let progress = send_progress()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert_eq!(progress.status, "finished");
+        assert_eq!(progress.completed_files, 1);
+        assert_eq!(progress.sent_bytes, 11);
         let _ = std::fs::remove_file(file_path);
     }
 
@@ -1105,7 +1253,14 @@ mod tests {
         let model = CString::new("Test Mac").unwrap();
         let token = CString::new("https-receiver-token").unwrap();
         assert_eq!(
-            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr()),
+            localsendcore_start_server(
+                port,
+                alias.as_ptr(),
+                model.as_ptr(),
+                1,
+                token.as_ptr(),
+                true
+            ),
             0
         );
         let _guard = ServerGuard;
@@ -1190,7 +1345,14 @@ mod tests {
         let model = CString::new("iPhone").unwrap();
         let token = CString::new("v1-receiver-token").unwrap();
         assert_eq!(
-            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 0, token.as_ptr()),
+            localsendcore_start_server(
+                port,
+                alias.as_ptr(),
+                model.as_ptr(),
+                0,
+                token.as_ptr(),
+                true
+            ),
             0
         );
         let _guard = ServerGuard;
@@ -1256,6 +1418,43 @@ mod tests {
     }
 
     #[test]
+    fn ffi_receives_text_message_without_user_acceptance() {
+        let _test_guard = ffi_test_lock();
+        let port = {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        receive::set_pin(None);
+        let alias = CString::new("Filz Text Receiver").unwrap();
+        let model = CString::new("iPhone").unwrap();
+        let token = CString::new("text-receiver-token").unwrap();
+        assert_eq!(
+            localsendcore_start_server(
+                port,
+                alias.as_ptr(),
+                model.as_ptr(),
+                0,
+                token.as_ptr(),
+                true
+            ),
+            0
+        );
+        let _guard = ServerGuard;
+
+        let sender = std::thread::spawn(move || {
+            let body = r#"{"info":{"alias":"LocalSend Sender","version":"2.1","deviceModel":"Mac","deviceType":"desktop","fingerprint":"sender-token","port":53317,"protocol":"https","download":false},"files":{"message-file":{"id":"message-file","fileName":"message-file.txt","size":11,"fileType":"text/plain","preview":"hello world"}}}"#;
+            let (status, response) = post_https(port, "/api/localsend/v2/prepare-upload", body);
+            assert_eq!(status, 204, "{}", String::from_utf8_lossy(&response));
+        });
+        sender.join().unwrap();
+        assert_eq!(receive::pending_json(), "null");
+        let progress: serde_json::Value = serde_json::from_str(&receive::progress_json()).unwrap();
+        assert_eq!(progress["status"], "finished");
+        assert_eq!(progress["textMessage"], "hello world");
+        assert_eq!(progress["completedFiles"], 1);
+    }
+
+    #[test]
     fn ffi_receives_file_after_user_accepts() {
         let _test_guard = ffi_test_lock();
         let port = {
@@ -1271,7 +1470,14 @@ mod tests {
         let model = CString::new("Test Mac").unwrap();
         let token = CString::new("test-token").unwrap();
         assert_eq!(
-            localsendcore_start_server(port, alias.as_ptr(), model.as_ptr(), 1, token.as_ptr()),
+            localsendcore_start_server(
+                port,
+                alias.as_ptr(),
+                model.as_ptr(),
+                1,
+                token.as_ptr(),
+                true
+            ),
             0
         );
         let _guard = ServerGuard;

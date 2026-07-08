@@ -96,7 +96,9 @@ struct AttachmentSelectionSheet: View {
                 Task { await importPhotos(photos) }
             }
             .sheet(isPresented: $showTextComposer) {
-                TextTransferComposer { url in coreStatus.addFiles([url]) }
+                TextTransferComposer { url, preview in
+                    coreStatus.addTextFile(url, preview: preview)
+                }
             }
             .sheet(isPresented: $showDestinationPicker) {
                 DestinationSelectionSheet(allowsMultipleDestinations: allowsMultipleDestinations)
@@ -229,6 +231,9 @@ struct AttachmentSelectionSheet: View {
 
     private func send() {
         guard let setting = settings.first else { return }
+        // Validate before dismissing so failures stay visible in this sheet.
+        guard coreStatus.validateSendPreconditions(portText: setting.port) else { return }
+        dismiss()
         Task {
             await coreStatus.sendSelectedFiles(
                 alias: setting.userName,
@@ -237,7 +242,6 @@ struct AttachmentSelectionSheet: View {
                 deviceIcon: setting.selectedDeviceIcon,
                 saveToHistory: setting.saveToHistory
             )
-            if coreStatus.transferError == nil { dismiss() }
         }
     }
 

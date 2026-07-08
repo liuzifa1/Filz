@@ -1,6 +1,9 @@
 mod crypto;
+mod discovery;
 mod http;
 mod model;
+mod receive;
+mod tls_identity;
 mod util;
 mod webrtc;
 

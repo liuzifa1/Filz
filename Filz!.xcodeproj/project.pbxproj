@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		84A100022F70000100AE3A80 /* LocalSendCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84A100012F70000100AE3A80 /* LocalSendCore.xcframework */; };
 		84B200012F80000100AE3A80 /* LiquidSendTransferWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		84C300012F90000100AE3A80 /* LiquidSendShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,13 +33,6 @@
 			remoteGlobalIDString = 84B2000A2F80000100AE3A80;
 			remoteInfo = LiquidSendTransferWidget;
 		};
-		84C300022F90000100AE3A80 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 845915E82F1A412C00B08687 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 84C300092F90000100AE3A80;
-			remoteInfo = LiquidSendShareExtension;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -51,7 +43,6 @@
 			dstSubfolderSpec = 13;
 			files = (
 				84B200012F80000100AE3A80 /* LiquidSendTransferWidget.appex in Embed App Extensions */,
-				84C300012F90000100AE3A80 /* LiquidSendShareExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -64,7 +55,6 @@
 		845916092F1A412E00B08687 /* Filz!UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Filz!UITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		84A100012F70000100AE3A80 /* LocalSendCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = LocalSendCore.xcframework; sourceTree = "<group>"; };
 		84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiquidSendTransferWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiquidSendShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -72,8 +62,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				catz.icon,
-				filz.icon,
 			);
 			target = 845915EF2F1A412C00B08687 /* Filz! */;
 		};
@@ -99,13 +87,6 @@
 				liquidsendUITestsLaunchTests.swift,
 			);
 			target = 845916082F1A412E00B08687 /* Filz!UITests */;
-		};
-		84C300032F90000100AE3A80 /* Exceptions for "LiquidSendShareExtension" folder in "LiquidSendShareExtension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 84C300092F90000100AE3A80 /* LiquidSendShareExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -133,14 +114,6 @@
 				84B200042F80000100AE3A80 /* Exceptions for "LiquidSendTransferWidget" folder in "LiquidSendTransferWidget" target */,
 			);
 			path = LiquidSendTransferWidget;
-			sourceTree = "<group>";
-		};
-		84C300042F90000100AE3A80 /* LiquidSendShareExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				84C300032F90000100AE3A80 /* Exceptions for "LiquidSendShareExtension" folder in "LiquidSendShareExtension" target */,
-			);
-			path = LiquidSendShareExtension;
 			sourceTree = "<group>";
 		};
 		84CC6B402F6BDCB200AE3A80 /* LocalsendCore */ = {
@@ -180,13 +153,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		84C300052F90000100AE3A80 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -197,7 +163,6 @@
 				845916022F1A412E00B08687 /* liquidsendTests */,
 				84CC6B402F6BDCB200AE3A80 /* LocalsendCore */,
 				84B200052F80000100AE3A80 /* LiquidSendTransferWidget */,
-				84C300042F90000100AE3A80 /* LiquidSendShareExtension */,
 				84A100002F70000100AE3A80 /* Frameworks */,
 				845915F12F1A412C00B08687 /* Products */,
 			);
@@ -210,7 +175,6 @@
 				845915FF2F1A412E00B08687 /* Filz!Tests.xctest */,
 				845916092F1A412E00B08687 /* Filz!UITests.xctest */,
 				84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */,
-				84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -239,7 +203,6 @@
 			);
 			dependencies = (
 				84B2000B2F80000100AE3A80 /* PBXTargetDependency */,
-				84C3000A2F90000100AE3A80 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				845915F22F1A412C00B08687 /* liquidsendApp */,
@@ -316,28 +279,6 @@
 			productReference = 84B200002F80000100AE3A80 /* LiquidSendTransferWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		84C300092F90000100AE3A80 /* LiquidSendShareExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 84C300102F90000100AE3A80 /* Build configuration list for PBXNativeTarget "LiquidSendShareExtension" */;
-			buildPhases = (
-				84C300062F90000100AE3A80 /* Sources */,
-				84C300052F90000100AE3A80 /* Frameworks */,
-				84C300072F90000100AE3A80 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				84C300042F90000100AE3A80 /* LiquidSendShareExtension */,
-			);
-			name = LiquidSendShareExtension;
-			packageProductDependencies = (
-			);
-			productName = LiquidSendShareExtension;
-			productReference = 84C300002F90000100AE3A80 /* LiquidSendShareExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -362,9 +303,6 @@
 					84B2000A2F80000100AE3A80 = {
 						CreatedOnToolsVersion = 26.1.1;
 					};
-					84C300092F90000100AE3A80 = {
-						CreatedOnToolsVersion = 26.1.1;
-					};
 				};
 			};
 			buildConfigurationList = 845915EB2F1A412C00B08687 /* Build configuration list for PBXProject "Filz!" */;
@@ -385,7 +323,6 @@
 				845915FE2F1A412E00B08687 /* Filz!Tests */,
 				845916082F1A412E00B08687 /* Filz!UITests */,
 				84B2000A2F80000100AE3A80 /* LiquidSendTransferWidget */,
-				84C300092F90000100AE3A80 /* LiquidSendShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -413,13 +350,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		84B200082F80000100AE3A80 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		84C300072F90000100AE3A80 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -457,13 +387,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		84C300062F90000100AE3A80 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -481,11 +404,6 @@
 			isa = PBXTargetDependency;
 			target = 84B2000A2F80000100AE3A80 /* LiquidSendTransferWidget */;
 			targetProxy = 84B200022F80000100AE3A80 /* PBXContainerItemProxy */;
-		};
-		84C3000A2F90000100AE3A80 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 84C300092F90000100AE3A80 /* LiquidSendShareExtension */;
-			targetProxy = 84C300022F90000100AE3A80 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -833,64 +751,6 @@
 			};
 			name = Release;
 		};
-		84C3000E2F90000100AE3A80 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = LiquidSendShareExtension/LiquidSendShareExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MBBPM3967F;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LiquidSendShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = top.kitsune.filz.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		84C3000F2F90000100AE3A80 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = LiquidSendShareExtension/LiquidSendShareExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MBBPM3967F;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LiquidSendShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = top.kitsune.filz.ShareExtension;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -935,15 +795,6 @@
 			buildConfigurations = (
 				84B2000E2F80000100AE3A80 /* Debug */,
 				84B2000F2F80000100AE3A80 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		84C300102F90000100AE3A80 /* Build configuration list for PBXNativeTarget "LiquidSendShareExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				84C3000E2F90000100AE3A80 /* Debug */,
-				84C3000F2F90000100AE3A80 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

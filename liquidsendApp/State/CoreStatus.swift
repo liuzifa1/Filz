@@ -16,11 +16,13 @@ final class CoreStatus {
     var coreVersion: String = LocalSendCoreClient.version
     var lastError: String?
     var activePort: UInt16?
+    var activeProtocol: String = "https"
     var localIPv4Addresses: [String] = NetworkInterfaceAddresses.localIPv4
     var receivePIN: String?
     var nearbyDevices: [LocalSendDevice] = LocalSendCoreClient.discoveredDevices
     var selectedFileURLs: [URL] = []
     var selectedFileSizes: [URL: Int64] = [:]
+    var selectedTextPreviews: [URL: String] = [:]
     var selectedDevices: [LocalSendDevice] = []
     var transferPIN: String = ""
     var isSending: Bool = false
@@ -31,6 +33,7 @@ final class CoreStatus {
     var receiveProgress: LocalSendTransferProgress?
     private(set) var pendingHistoryDrafts: [TransferHistoryDraft] = []
     private var lastReceiveStatus: String?
+    private var lastReceiveRequestID: String?
     private var saveReceivedMediaToGallery = false
 
     var selectedTotalSize: Int64 {
@@ -55,6 +58,7 @@ final class CoreStatus {
         )
         if let error = LocalSendCoreClient.lastError {
             lastError = error
+            LocalSendCoreClient.clearLastError()
         }
     }
 
@@ -66,9 +70,9 @@ final class CoreStatus {
     func selectFiles(_ urls: [URL]) {
         selectedFileURLs = urls
         selectedFileSizes = urls.reduce(into: [:]) { result, url in
-            result[url] = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize)
-                .map(Int64.init) ?? 0
+            result[url] = fileSize(for: url)
         }
+        selectedTextPreviews = [:]
         transferMessage = nil
         transferError = nil
     }
@@ -78,17 +82,22 @@ final class CoreStatus {
         guard !additions.isEmpty else { return }
         selectedFileURLs.append(contentsOf: additions)
         for url in additions {
-            selectedFileSizes[url] = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize)
-                .map(Int64.init) ?? 0
+            selectedFileSizes[url] = fileSize(for: url)
         }
         transferMessage = nil
         transferError = nil
+    }
+
+    func addTextFile(_ url: URL, preview: String) {
+        addFiles([url])
+        selectedTextPreviews[url] = preview
     }
 
     func clearSelectedFile() {
         guard !isSending else { return }
         selectedFileURLs = []
         selectedFileSizes = [:]
+        selectedTextPreviews = [:]
         transferMessage = nil
         transferError = nil
     }
@@ -131,6 +140,23 @@ final class CoreStatus {
         )
     }
 
+    @discardableResult
+    func validateSendPreconditions(portText: String) -> Bool {
+        guard !selectedFileURLs.isEmpty else {
+            transferError = "Add one or more attachments before sending."
+            return false
+        }
+        guard !selectedDevices.isEmpty else {
+            transferError = "Choose at least one destination."
+            return false
+        }
+        guard (UInt16(portText) ?? 0) > 0 else {
+            transferError = "Enter a valid local server port in Settings."
+            return false
+        }
+        return true
+    }
+
     func sendSelectedFiles(
         alias: String,
         portText: String,
@@ -139,22 +165,9 @@ final class CoreStatus {
         saveToHistory: Bool
     ) async {
         guard !isSending else { return }
-        guard !selectedFileURLs.isEmpty else {
-            transferError = "Add one or more attachments before sending."
+        guard validateSendPreconditions(portText: portText),
+              let senderPort = UInt16(portText) else {
             return
-        }
-        guard !selectedDevices.isEmpty else {
-            transferError = "Choose at least one destination."
-            return
-        }
-        guard let senderPort = UInt16(portText), senderPort > 0 else {
-            transferError = "Enter a valid local server port in Settings."
-            return
-        }
-
-        let accessedURLs = selectedFileURLs.filter { $0.startAccessingSecurityScopedResource() }
-        defer {
-            accessedURLs.forEach { $0.stopAccessingSecurityScopedResource() }
         }
 
         isSending = true
@@ -166,14 +179,27 @@ final class CoreStatus {
                 filePath: fileURL.path,
                 fileName: fileURL.lastPathComponent,
                 fileType: UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType
-                    ?? "application/octet-stream"
+                    ?? "application/octet-stream",
+                preview: selectedTextPreviews[fileURL]
             )
         }
         let senderToken = LocalSendCoreClient.identityToken
         let senderAlias = alias.isEmpty ? "LiquidSend" : alias
+        let senderProtocol = activeProtocol
         let senderModel = deviceModel.isEmpty ? "iPhone" : deviceModel
         let senderDeviceType = deviceIcon.coreDeviceType
         let totalSize = selectedTotalSize
+        let isTextOnlyTransfer = selectedFileURLs.count == 1
+            && selectedFileURLs.allSatisfy { selectedTextPreviews[$0]?.isEmpty == false }
+        let textMessage = isTextOnlyTransfer
+            ? selectedFileURLs.compactMap { selectedTextPreviews[$0] }.first
+            : nil
+
+        let accessedURLs = selectedFileURLs.filter { $0.startAccessingSecurityScopedResource() }
+        defer {
+            accessedURLs.forEach { $0.stopAccessingSecurityScopedResource() }
+        }
+
         var failedDevices: [LocalSendDevice] = []
         var failureMessages: [String] = []
 
@@ -189,6 +215,7 @@ final class CoreStatus {
                     recipientPIN: pin,
                     senderAlias: senderAlias,
                     senderPort: senderPort,
+                    senderProtocol: senderProtocol,
                     senderDeviceModel: senderModel,
                     senderDeviceType: senderDeviceType,
                     senderToken: senderToken
@@ -206,7 +233,8 @@ final class CoreStatus {
                         direction: .sent,
                         peerName: device.alias,
                         peerFingerprint: device.token,
-                        fileNames: files.map(\.fileName),
+                        fileNames: textMessage == nil ? files.map(\.fileName) : [],
+                        textMessage: textMessage,
                         totalBytes: totalSize,
                         result: .failed,
                         errorMessage: error
@@ -217,7 +245,8 @@ final class CoreStatus {
                     direction: .sent,
                     peerName: device.alias,
                     peerFingerprint: device.token,
-                    fileNames: files.map(\.fileName),
+                    fileNames: textMessage == nil ? files.map(\.fileName) : [],
+                    textMessage: textMessage,
                     totalBytes: totalSize,
                     result: .completed
                 )
@@ -232,10 +261,13 @@ final class CoreStatus {
             return
         }
         if failedDevices.isEmpty {
-            transferMessage = "Sent \(files.count) item(s) to \(selectedDevices.count) destination(s)."
+            transferMessage = isTextOnlyTransfer
+                ? "Sent"
+                : "Sent \(files.count) item(s) to \(selectedDevices.count) destination(s)."
             transferError = nil
             selectedFileURLs = []
             selectedFileSizes = [:]
+            selectedTextPreviews = [:]
             selectedDevices = []
             transferPIN = ""
         } else {
@@ -301,10 +333,26 @@ final class CoreStatus {
         return pendingHistoryDrafts
     }
 
+    private func fileSize(for url: URL) -> Int64 {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+            .map(Int64.init) ?? 0
+    }
+
     private func recordReceiveCompletionIfNeeded(_ progress: LocalSendTransferProgress?) {
-        defer { lastReceiveStatus = progress?.status }
+        defer {
+            lastReceiveStatus = progress?.status
+            lastReceiveRequestID = progress?.requestID
+        }
+        // Compare the request ID too: back-to-back text messages jump straight
+        // to "finished" with no intermediate status the 1s poller could see.
         guard let progress,
-              progress.status != lastReceiveStatus,
+              progress.status != lastReceiveStatus || progress.requestID != lastReceiveRequestID,
               progress.status == "finished" || progress.status == "failed" else {
             return
         }
@@ -316,7 +364,8 @@ final class CoreStatus {
             direction: .received,
             peerName: progress.senderAlias ?? "LocalSend device",
             peerFingerprint: progress.senderFingerprint,
-            fileNames: paths.map { URL(fileURLWithPath: $0).lastPathComponent },
+            fileNames: progress.textMessage == nil ? paths.map { URL(fileURLWithPath: $0).lastPathComponent } : [],
+            textMessage: progress.textMessage,
             totalBytes: Int64(clamping: progress.totalBytes),
             result: progress.status == "finished" ? .completed : .failed,
             savedPaths: paths,
@@ -329,6 +378,7 @@ final class CoreStatus {
         peerName: String,
         peerFingerprint: String? = nil,
         fileNames: [String],
+        textMessage: String? = nil,
         totalBytes: Int64,
         result: TransferResult,
         savedPaths: [String] = [],
@@ -341,6 +391,7 @@ final class CoreStatus {
                 peerName: peerName,
                 peerFingerprint: peerFingerprint,
                 fileNames: fileNames,
+                textMessage: textMessage,
                 totalBytes: totalBytes,
                 result: result,
                 savedPaths: savedPaths,
@@ -379,6 +430,7 @@ final class CoreStatus {
         portText: String,
         deviceModel: String,
         deviceIcon: AppDeviceIcon,
+        useEncryption: Bool = true,
         receivePIN: String? = nil
     ) -> Bool {
         guard let port = UInt16(portText), port > 0 else {
@@ -398,11 +450,13 @@ final class CoreStatus {
             port: port,
             alias: alias.isEmpty ? "LiquidSend" : alias,
             deviceModel: deviceModel.isEmpty ? "iPhone" : deviceModel,
-            deviceType: deviceIcon.coreDeviceType
+            deviceType: deviceIcon.coreDeviceType,
+            useTLS: useEncryption
         )
 
         lastError = error
         activePort = error == nil ? port : nil
+        activeProtocol = useEncryption ? "https" : "http"
         refresh()
         if error == nil {
             LocalSendCoreClient.refreshDiscovery()
@@ -415,6 +469,7 @@ final class CoreStatus {
         portText: String,
         deviceModel: String,
         deviceIcon: AppDeviceIcon,
+        useEncryption: Bool = true,
         receivePIN: String? = nil
     ) {
         stop()
@@ -423,6 +478,7 @@ final class CoreStatus {
             portText: portText,
             deviceModel: deviceModel,
             deviceIcon: deviceIcon,
+            useEncryption: useEncryption,
             receivePIN: receivePIN
         )
     }
@@ -430,6 +486,7 @@ final class CoreStatus {
     func stop() {
         LocalSendCoreClient.stopServer()
         activePort = nil
+        activeProtocol = "https"
         lastError = nil
         refresh()
     }

@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 private enum HistoryFilter: String, CaseIterable, Identifiable {
     case all
@@ -52,6 +53,7 @@ struct HistoryView: View {
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             let matchesSearch = query.isEmpty
                 || entry.peerName.localizedCaseInsensitiveContains(query)
+                || (entry.textMessage?.localizedCaseInsensitiveContains(query) == true)
                 || entry.fileNames.contains { $0.localizedCaseInsensitiveContains(query) }
             return matchesFilter && matchesSearch
         }
@@ -141,9 +143,11 @@ struct HistoryView: View {
                             } label: {
                                 HistoryRow(entry: entry)
                             }
-                        }
-                        .onDelete { offsets in
-                            delete(offsets, from: group)
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    delete(entry)
+                                }
+                            }
                         }
                     }
                 }
@@ -173,10 +177,8 @@ struct HistoryView: View {
         }
     }
 
-    private func delete(_ offsets: IndexSet, from group: HistoryTimeGroup) {
-        for index in offsets {
-            modelContext.delete(group.entries[index])
-        }
+    private func delete(_ entry: TransferHistoryEntry) {
+        modelContext.delete(entry)
         try? modelContext.save()
     }
 
@@ -208,6 +210,7 @@ struct HistoryView: View {
             completedFiles: 0,
             totalFiles: request.files.count,
             savedPaths: nil,
+            textMessage: request.textMessage,
             error: nil
         )
     }
@@ -261,17 +264,30 @@ private struct ActiveTransferRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                ProgressView(value: transfer.progress.fractionCompleted)
-                    .animation(.linear(duration: 0.25), value: transfer.progress.fractionCompleted)
-                HStack {
-                    Text(statusDetail)
-                        .lineLimit(1)
-                    Spacer()
-                    Text(transfer.progress.percentText)
-                        .monospacedDigit()
+                if let text = transfer.progress.textMessage, !text.isEmpty {
+                    Text(text)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                    Text("Text")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView(value: transfer.progress.fractionCompleted)
+                        .animation(.linear(duration: 0.25), value: transfer.progress.fractionCompleted)
+                    HStack {
+                        Text(statusDetail)
+                            .lineLimit(1)
+                        Spacer()
+                        Text(transfer.progress.percentText)
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
     }
@@ -308,7 +324,7 @@ private struct HistoryRow: View {
                 Text(fileSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(entry.textMessage == nil ? 1 : 2)
                 Text(entry.timestamp, format: .dateTime.month().day().hour().minute())
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -321,6 +337,9 @@ private struct HistoryRow: View {
     }
 
     private var fileSummary: String {
+        if let text = entry.textMessage, !text.isEmpty {
+            return text
+        }
         guard let first = entry.fileNames.first else { return entry.direction.title }
         return entry.fileNames.count == 1 ? first : "\(first) +\(entry.fileNames.count - 1)"
     }
@@ -348,24 +367,34 @@ private struct HistoryDetailView: View {
                 LabeledContent("Date", value: entry.timestamp.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Status", value: entry.result.rawValue.capitalized)
             }
-            Section("Files") {
-                ForEach(Array(entry.fileNames.enumerated()), id: \.offset) { index, name in
-                    HStack {
-                        Image(systemName: FileIcon.systemImage(forFileName: name))
-                            .foregroundStyle(.secondary)
-                        Text(name)
-                            .lineLimit(2)
-                        Spacer()
-                        if index < entry.savedPaths.count {
-                            Text(URL(fileURLWithPath: entry.savedPaths[index]).deletingLastPathComponent().lastPathComponent)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+            if let text = entry.textMessage, !text.isEmpty {
+                Section("Text") {
+                    Text(text)
+                        .textSelection(.enabled)
+                    Button("Copy Text", systemImage: "doc.on.doc") {
+                        UIPasteboard.general.string = text
                     }
                 }
-                if !entry.savedPaths.isEmpty {
-                    Button("Open in Files", systemImage: "folder") {
-                        FilesLocationOpener.openReceivedFiles()
+            } else {
+                Section("Files") {
+                    ForEach(Array(entry.fileNames.enumerated()), id: \.offset) { index, name in
+                        HStack {
+                            Image(systemName: FileIcon.systemImage(forFileName: name))
+                                .foregroundStyle(.secondary)
+                            Text(name)
+                                .lineLimit(2)
+                            Spacer()
+                            if index < entry.savedPaths.count {
+                                Text(URL(fileURLWithPath: entry.savedPaths[index]).deletingLastPathComponent().lastPathComponent)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if !entry.savedPaths.isEmpty {
+                        Button("Open in Files", systemImage: "escape") {
+                            FilesLocationOpener.openReceivedFiles()
+                        }
                     }
                 }
             }

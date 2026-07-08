@@ -35,6 +35,7 @@ struct TransferHistoryDraft: Equatable {
     let peerName: String
     let peerFingerprint: String?
     let fileNames: [String]
+    let textMessage: String?
     let totalBytes: Int64
     let result: TransferResult
     let savedPaths: [String]
@@ -49,6 +50,7 @@ final class TransferHistoryEntry {
     var peerName: String
     var peerFingerprint: String?
     var fileNamesData: Data
+    var textMessage: String?
     var totalBytes: Int64
     var resultRaw: String
     var savedPathsData: Data
@@ -61,6 +63,7 @@ final class TransferHistoryEntry {
         peerName = draft.peerName
         peerFingerprint = draft.peerFingerprint
         fileNamesData = (try? JSONEncoder().encode(draft.fileNames)) ?? Data()
+        textMessage = draft.textMessage
         totalBytes = draft.totalBytes
         resultRaw = draft.result.rawValue
         savedPathsData = (try? JSONEncoder().encode(draft.savedPaths)) ?? Data()

@@ -67,6 +67,7 @@ struct LocalSendFile: Codable, Identifiable, Sendable {
     let filePath: String
     let fileName: String
     let fileType: String
+    let preview: String?
 
     var id: String { filePath }
 }
@@ -76,6 +77,7 @@ struct IncomingLocalSendFile: Decodable, Identifiable, Hashable {
     let fileName: String
     let size: UInt64
     let fileType: String
+    let preview: String?
 }
 
 struct IncomingLocalSendRequest: Decodable, Identifiable, Hashable {
@@ -88,6 +90,20 @@ struct IncomingLocalSendRequest: Decodable, Identifiable, Hashable {
     let senderFingerprint: String?
     let files: [IncomingLocalSendFile]
     let totalBytes: UInt64
+
+    // Mirrors the core's text_message() rule: exactly one text/* file with a
+    // non-empty preview. Any file may carry a preview per the protocol, so
+    // grabbing the first preview alone would misclassify multi-file batches.
+    var textMessage: String? {
+        guard files.count == 1,
+              let file = files.first,
+              file.fileType.hasPrefix("text/"),
+              let preview = file.preview,
+              !preview.isEmpty else {
+            return nil
+        }
+        return preview
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -122,6 +138,7 @@ struct LocalSendTransferProgress: Decodable, Equatable {
     let completedFiles: Int
     let totalFiles: Int
     let savedPaths: [String]?
+    let textMessage: String?
     let error: String?
 
     enum CodingKeys: String, CodingKey {
@@ -144,6 +161,7 @@ struct LocalSendTransferProgress: Decodable, Equatable {
         case completedFiles
         case totalFiles
         case savedPaths
+        case textMessage
         case error
     }
 
@@ -158,6 +176,10 @@ struct LocalSendTransferProgress: Decodable, Equatable {
 
     var percentText: String {
         "\(Int((fractionCompleted * 100).rounded()))%"
+    }
+
+    var isTextMessage: Bool {
+        textMessage?.isEmpty == false
     }
 
     var elapsedSeconds: TimeInterval? {

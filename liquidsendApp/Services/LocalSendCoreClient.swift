@@ -39,13 +39,18 @@ enum LocalSendCoreClient {
         return error.isEmpty ? nil : error
     }
 
+    static func clearLastError() {
+        localsendcore_clear_last_error()
+    }
+
     static func startServer(
         port: UInt16,
         alias: String,
         deviceModel: String,
-        deviceType: UInt8
+        deviceType: UInt8,
+        useTLS: Bool
     ) -> String? {
-        if let error = configureTLSIdentity(commonName: alias) {
+        if useTLS, let error = configureTLSIdentity(commonName: alias) {
             return error
         }
         let result: Int32 = alias.withCString { aliasPointer in
@@ -56,7 +61,8 @@ enum LocalSendCoreClient {
                         aliasPointer,
                         deviceModelPointer,
                         deviceType,
-                        tokenPointer
+                        tokenPointer,
+                        useTLS
                     )
                 }
             }
@@ -65,7 +71,7 @@ enum LocalSendCoreClient {
         return result == 0 ? nil : lastError ?? "Unable to start LocalSend Core"
     }
 
-    private static func configureTLSIdentity(commonName: String) -> String? {
+    nonisolated private static func configureTLSIdentity(commonName: String) -> String? {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appending(path: "LocalSend TLS", directoryHint: .isDirectory)
         do {
@@ -95,7 +101,7 @@ enum LocalSendCoreClient {
                 )
             }
         }
-        return result == 0 ? nil : lastError ?? "Unable to configure HTTPS identity"
+        return result == 0 ? nil : consumeLastError(fallback: "Unable to configure HTTPS identity")
     }
 
     static func stopServer() {
@@ -134,6 +140,10 @@ enum LocalSendCoreClient {
         fileName: String,
         fileType: String
     ) -> String? {
+        if device.protocol.localizedCaseInsensitiveCompare("https") == .orderedSame,
+           let error = configureTLSIdentity(commonName: senderAlias) {
+            return error
+        }
         let result: Int32 = device.ip.withCString { targetIP in
             device.protocol.withCString { targetProtocol in
                 senderAlias.withCString { alias in
@@ -164,11 +174,8 @@ enum LocalSendCoreClient {
             }
         }
 
-        guard result != 0, let pointer = localsendcore_last_error() else {
-            return nil
-        }
-        let error = String(cString: pointer)
-        return error.isEmpty ? "Unable to send file" : error
+        guard result != 0 else { return nil }
+        return consumeLastError(fallback: "Unable to send file")
     }
 
     nonisolated static func sendFiles(
@@ -177,10 +184,15 @@ enum LocalSendCoreClient {
         recipientPIN: String?,
         senderAlias: String,
         senderPort: UInt16,
+        senderProtocol: String,
         senderDeviceModel: String,
         senderDeviceType: UInt8,
         senderToken: String
     ) -> String? {
+        if device.protocol.localizedCaseInsensitiveCompare("https") == .orderedSame,
+           let error = configureTLSIdentity(commonName: senderAlias) {
+            return error
+        }
         guard let data = try? JSONEncoder().encode(files),
               let filesJSON = String(data: data, encoding: .utf8) else {
             return "Unable to encode selected files"
@@ -190,22 +202,25 @@ enum LocalSendCoreClient {
                 device.alias.withCString { targetAlias in
                     withOptionalCString(recipientPIN) { targetPIN in
                         senderAlias.withCString { alias in
-                            senderDeviceModel.withCString { model in
-                                senderToken.withCString { token in
-                                    filesJSON.withCString { files in
-                                        localsendcore_send_files_json(
-                                            targetIP,
-                                            device.port,
-                                            targetProtocol,
-                                            targetAlias,
-                                            targetPIN,
-                                            alias,
-                                            senderPort,
-                                            model,
-                                            senderDeviceType,
-                                            token,
-                                            files
-                                        )
+                            senderProtocol.withCString { senderProtocol in
+                                senderDeviceModel.withCString { model in
+                                    senderToken.withCString { token in
+                                        filesJSON.withCString { files in
+                                            localsendcore_send_files_json(
+                                                targetIP,
+                                                device.port,
+                                                targetProtocol,
+                                                targetAlias,
+                                                targetPIN,
+                                                alias,
+                                                senderPort,
+                                                senderProtocol,
+                                                model,
+                                                senderDeviceType,
+                                                token,
+                                                files
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -214,11 +229,8 @@ enum LocalSendCoreClient {
                 }
             }
         }
-        guard result != 0, let pointer = localsendcore_last_error() else {
-            return nil
-        }
-        let error = String(cString: pointer)
-        return error.isEmpty ? "Unable to send files" : error
+        guard result != 0 else { return nil }
+        return consumeLastError(fallback: "Unable to send files")
     }
 
     nonisolated private static func withOptionalCString<T>(
@@ -227,6 +239,15 @@ enum LocalSendCoreClient {
     ) -> T {
         guard let value, !value.isEmpty else { return body(nil) }
         return value.withCString(body)
+    }
+
+    nonisolated private static func consumeLastError(fallback: String) -> String {
+        defer { localsendcore_clear_last_error() }
+        guard let pointer = localsendcore_last_error() else {
+            return fallback
+        }
+        let error = String(cString: pointer)
+        return error.isEmpty ? fallback : error
     }
 
     static var pendingReceiveRequest: IncomingLocalSendRequest? {

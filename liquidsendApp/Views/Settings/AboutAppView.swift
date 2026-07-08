@@ -13,18 +13,21 @@ struct AboutAppView: View {
         Section {
             VStack(alignment: .leading) {
                 VStack(alignment: .leading) {
-                    Image ("logo512")
+                    Image ("filzLogoV1")
                         .resizable()
                         .scaledToFill()
-                        .frame(width:100)
-                    Text("Filz!")
+                        .frame(width:200)
+                    Text("What is Filz!")
                         .font(.headline)
                 }
-                Text("Filz is an app based on open-soured project Localsend, you can original localsend repository at")
+                Text("Filz aims to provide a native LocalSend experience on iOS. Thanks to the hard work of the LocalSend team, this app wouldn't be possible without the incredible foundation they laid.")
                     .foregroundStyle(.secondary)
-                Link("Here...", destination: URL(string: "https://localsend.org")!)
-            }
+                }
         }
         .navigationTitle("Filz!")
     }
+}
+
+#Preview {
+    AboutAppView()
 }

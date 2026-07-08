@@ -30,13 +30,18 @@ struct ContentView: View {
    @State private var showReceiveDetails = false
    
    private var setting: SettingsModel {
-           if let existing = settings.first{
+           if let existing = settings.first {
                return existing
-           } else {
-               let new = SettingsModel()
-               modelContext.insert(new)
-               return new
            }
+           var descriptor = FetchDescriptor<SettingsModel>()
+           descriptor.fetchLimit = 1
+           if let existing = try? modelContext.fetch(descriptor).first {
+               return existing
+           }
+           let new = SettingsModel()
+           modelContext.insert(new)
+           try? modelContext.save()
+           return new
        }
    
    // MARK: Body
@@ -49,28 +54,36 @@ struct ContentView: View {
                   selectDevice: { device in
                      coreStatus.selectDestination(device, replacingExisting: true)
                      presentAttachmentPanel()
-                  },
-                  selectMultiple: {
-                     coreStatus.clearDestinations()
-                     presentAttachmentPanel(showDestinations: true, allowsMultipleDestinations: true)
-                  },
-                  sendToIP: {
-                     coreStatus.clearDestinations()
-                     presentAttachmentPanel(showManualDestination: true)
                   }
                )
                   .navigationTitle(setting.userName)
                   .toolbarTitleDisplayMode(.inlineLarge)
                   .toolbar {
-                      // Attachments
+                      // More ways to send
                       ToolbarItem(placement: .topBarTrailing) {
-                          Button {
-                              coreStatus.clearDestinations()
-                              presentAttachmentPanel()
+                          Menu {
+                              Button {
+                                  coreStatus.clearDestinations()
+                                  presentAttachmentPanel()
+                              } label: {
+                                  Label("Add Attachments", systemImage: "paperclip")
+                              }
+                              Button {
+                                  coreStatus.clearDestinations()
+                                  presentAttachmentPanel(showManualDestination: true)
+                              } label: {
+                                  Label("Send to IP Address", systemImage: "network")
+                              }
+                              Button {
+                                  coreStatus.clearDestinations()
+                                  presentAttachmentPanel(showDestinations: true, allowsMultipleDestinations: true)
+                              } label: {
+                                  Label("Choose Multiple Destinations", systemImage: "person.2.badge.plus")
+                              }
                           } label: {
-                              Image(systemName: "paperclip")
+                              Image(systemName: "plus")
                           }
-                          .accessibilityLabel("Attach items")
+                          .accessibilityLabel("More ways to send")
                       }
                       // Settings button
                       ToolbarItem(placement: .topBarTrailing) {
@@ -116,25 +129,29 @@ struct ContentView: View {
       }
       .onChange(of: scenePhase) { _, phase in
          guard phase == .active else { return }
-         importSharedAttachments()
+         Task { await importSharedAttachments() }
       }
       .task {
-         importSharedAttachments()
+         await importSharedAttachments()
          if setting.userName == "Sponge Bob" {
             setting.userName = SettingsModel.defaultDeviceName()
+            try? modelContext.save()
          }
+         migrateEncryptionDefaultIfNeeded()
          if !coreStatus.isCoreRunning {
             coreStatus.start(
                alias: setting.userName,
                portText: setting.port,
                deviceModel: setting.deviceModel,
                deviceIcon: setting.selectedDeviceIcon,
+               useEncryption: setting.usesEncryption,
                receivePIN: setting.requirePIN ? setting.receivePIN : nil
             )
          }
          while !Task.isCancelled {
             if setting.userName == "Sponge Bob" {
                setting.userName = SettingsModel.defaultDeviceName()
+               try? modelContext.save()
             }
             coreStatus.refresh()
             coreStatus.applyReceivePolicy(
@@ -156,11 +173,41 @@ struct ContentView: View {
       }
    }
 
-   private func importSharedAttachments() {
-      let sharedImport = SharedAttachmentInbox.importPendingShare()
+   private func migrateEncryptionDefaultIfNeeded() {
+      let key = "FilzDidMigrateEncryptionDefault"
+      guard !UserDefaults.standard.bool(forKey: key) else { return }
+      setting.encryption = true
+      try? modelContext.save()
+      UserDefaults.standard.set(true, forKey: key)
+   }
+
+   private func importSharedAttachments(waitingUpTo timeout: TimeInterval = 0) async {
+      // The share extension opens the app before it finishes materializing
+      // the items; when launched through its deep link, wait for the manifest
+      // to land instead of importing nothing.
+      if timeout > 0 {
+         let deadline = Date().addingTimeInterval(timeout)
+         while !SharedAttachmentInbox.hasPendingShare, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(250))
+         }
+      }
+      // Off the main thread: bookmark handoffs from the share extension are
+      // copied here, which can be slow for large files.
+      let sharedImport = await Task.detached(priority: .userInitiated) {
+         SharedAttachmentInbox.importPendingShare()
+      }.value
       guard !sharedImport.urls.isEmpty else { return }
       selectedTab = .send
-      coreStatus.addFiles(sharedImport.urls)
+      let textURLs = Set(sharedImport.textPreviews.keys)
+      let fileURLs = sharedImport.urls.filter { !textURLs.contains($0) }
+      if !fileURLs.isEmpty {
+         coreStatus.addFiles(fileURLs)
+      }
+      for url in sharedImport.urls {
+         if let preview = sharedImport.textPreviews[url] {
+            coreStatus.addTextFile(url, preview: preview)
+         }
+      }
       coreStatus.clearDestinations()
       if !sharedImport.selectedFavouriteIDs.isEmpty {
          for device in coreStatus.nearbyDevices
@@ -178,7 +225,7 @@ struct ContentView: View {
    private func handleDeepLink(_ url: URL) {
       guard url.scheme == SharedAttachmentInbox.urlScheme else { return }
       if url.host == "shared-inbox" {
-         importSharedAttachments()
+         Task { await importSharedAttachments(waitingUpTo: 30) }
          return
       }
       if url.host == "receive" || url.host == "transfer" {

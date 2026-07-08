@@ -3,7 +3,7 @@ import SwiftUI
 struct TextTransferComposer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
-    let completion: (URL) -> Void
+    let completion: (URL, String) -> Void
 
     var body: some View {
         NavigationStack {
@@ -18,7 +18,7 @@ struct TextTransferComposer: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Add") {
                             guard let url = makeTextFile() else { return }
-                            completion(url)
+                            completion(url, text)
                             dismiss()
                         }
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

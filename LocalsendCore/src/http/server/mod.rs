@@ -180,7 +180,16 @@ async fn start_server_with_addr(
     );
 
     loop {
-        let (tcp_stream, remote_addr) = incoming.accept().await?;
+        let (tcp_stream, remote_addr) = match incoming.accept().await {
+            Ok(connection) => connection,
+            Err(error) => {
+                tracing::warn!("TCP accept error: {error:#}");
+                // Back off so a persistent failure (e.g. fd exhaustion)
+                // doesn't spin this loop hot.
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                continue;
+            }
+        };
 
         let tls_acceptor = tls_acceptor.clone();
         let app_state = app_state.clone();
@@ -203,7 +212,9 @@ async fn start_server_with_addr(
                                 .deref()
                                 .deref()
                                 .peer_certificates()
-                                .map(|cert| cert.get(0).unwrap().to_vec()),
+                                .and_then(|certificates| {
+                                    certificates.first().map(|certificate| certificate.to_vec())
+                                }),
                         }
                     };
 
@@ -470,6 +481,58 @@ fn query_parameters(query: Option<&str>) -> std::collections::HashMap<String, St
         .unwrap_or_default()
         .split('&')
         .filter_map(|part| part.split_once('='))
-        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .map(|(key, value)| (decode_query_component(key), decode_query_component(value)))
         .collect()
+}
+
+fn decode_query_component(value: &str) -> String {
+    fn hex_value(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            b'A'..=b'F' => Some(byte - b'A' + 10),
+            _ => None,
+        }
+    }
+
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'+' => {
+                decoded.push(b' ');
+                index += 1;
+            }
+            b'%' if index + 2 < bytes.len() => {
+                if let (Some(high), Some(low)) =
+                    (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+                {
+                    decoded.push((high << 4) | low);
+                    index += 3;
+                } else {
+                    decoded.push(bytes[index]);
+                    index += 1;
+                }
+            }
+            byte => {
+                decoded.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::query_parameters;
+
+    #[test]
+    fn query_parameters_decodes_pins() {
+        let query = query_parameters(Some("pin=12+34%26%3D&fileId=a%2Fb"));
+
+        assert_eq!(query.get("pin").map(String::as_str), Some("12 34&="));
+        assert_eq!(query.get("fileId").map(String::as_str), Some("a/b"));
+    }
 }

@@ -77,7 +77,7 @@ final class SettingsModel {
         deviceModel: String = "",
         port: String = "53317",
         discoveryTimeout: Int = 500,
-        encryption: Bool = false
+        encryption: Bool = true
     ) {
         self.quickSave = quickSave
         self.quickSaveFavourites = quickSaveFavourites
@@ -97,8 +97,18 @@ final class SettingsModel {
         self.encryption = encryption
     }
 
+    var usesEncryption: Bool {
+        !isAdvancedNetworkingOn || encryption
+    }
+
     static func defaultDeviceName() -> String {
-        "Filz!\(Int.random(in: 1000...9999))"
+        let key = "FilzDefaultDeviceName"
+        if let existing = UserDefaults.standard.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+        let generated = "Filz!\(Int.random(in: 1000...9999))"
+        UserDefaults.standard.set(generated, forKey: key)
+        return generated
     }
 
     func isFavourite(_ device: LocalSendDevice) -> Bool {

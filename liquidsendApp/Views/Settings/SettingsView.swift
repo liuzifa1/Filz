@@ -22,12 +22,20 @@ struct SettingsView: View {
             } else {
                 ProgressView()
                     .onAppear {
-                        // Create default settings if none exist
-                        let newSettings = SettingsModel()
-                        modelContext.insert(newSettings)
+                        ensureSettingsModelExists()
                     }
             }
         }
+    }
+
+    private func ensureSettingsModelExists() {
+        var descriptor = FetchDescriptor<SettingsModel>()
+        descriptor.fetchLimit = 1
+        if (try? modelContext.fetch(descriptor).first) != nil {
+            return
+        }
+        modelContext.insert(SettingsModel())
+        try? modelContext.save()
     }
 }
 
@@ -126,7 +134,6 @@ struct SettingsFormView: View {
                     }
                     
                     Toggle("Encryption", isOn: $settings.encryption)
-                        .disabled(true)
                     
                 }
                 Button(
@@ -169,6 +176,9 @@ struct SettingsFormView: View {
                 NavigationLink("About Filz!") {
                     AboutAppView()
                 }
+                NavigationLink("Open Source Acknowledgements") {
+                    OpenSourceAcknowledgementsView()
+                }
             }
         }
         .toolbar {
@@ -194,6 +204,12 @@ struct SettingsFormView: View {
             }
             applyReceivePIN()
         }
+        .onChange(of: settings.isAdvancedNetworkingOn) { _, _ in
+            restartServerIfRunning()
+        }
+        .onChange(of: settings.encryption) { _, _ in
+            restartServerIfRunning()
+        }
         .onChange(of: settings.receivePIN) { _, _ in applyReceivePIN() }
         .alert("Change Device Name", isPresented: $showIdentityEditor) {
             TextField("Device Name", text: $identityName)
@@ -204,15 +220,14 @@ struct SettingsFormView: View {
         } message: {
             Text(coreStatus.isCoreRunning ? "Applying this restarts the LocalSend server so nearby devices see the new name." : "This name is advertised to nearby LocalSend devices when the server starts.")
         }
-        .confirmationDialog(
-            "Delete all transfer history?",
-            isPresented: $showHistoryDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Delete all transfer history?", isPresented: $showHistoryDeleteConfirmation) {
             Button("Delete History", role: .destructive) {
                 historyEntries.forEach(modelContext.delete)
                 try? modelContext.save()
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes all saved transfer records.")
         }
     }
 
@@ -222,6 +237,7 @@ struct SettingsFormView: View {
             portText: settings.port,
             deviceModel: settings.deviceModel,
             deviceIcon: settings.selectedDeviceIcon,
+            useEncryption: settings.usesEncryption,
             receivePIN: settings.requirePIN ? settings.receivePIN : nil
         )
     }
@@ -245,8 +261,14 @@ struct SettingsFormView: View {
             portText: settings.port,
             deviceModel: settings.deviceModel,
             deviceIcon: settings.selectedDeviceIcon,
+            useEncryption: settings.usesEncryption,
             receivePIN: settings.requirePIN ? settings.receivePIN : nil
         )
+    }
+
+    private func restartServerIfRunning() {
+        guard coreStatus.isCoreRunning else { return }
+        restartServer()
     }
 
     private func applyReceivePIN() {

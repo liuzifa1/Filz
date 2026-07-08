@@ -64,6 +64,7 @@ final class TransferActivityCoordinator {
                 completedFiles: 0,
                 totalFiles: pendingReceive.files.count,
                 savedPaths: nil,
+                textMessage: pendingReceive.textMessage,
                 error: nil
             )
             direction = "Receiving"

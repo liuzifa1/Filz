@@ -9,13 +9,13 @@
           "blend-mode" : "normal",
           "fill" : "none",
           "glass" : true,
-          "image-name" : "IMG_6408 2.png",
-          "name" : "IMG_6408 2",
+          "image-name" : "IMG_6408_2.png",
+          "name" : "IMG_6408_2",
           "position" : {
             "scale" : 5,
             "translation-in-points" : [
-              57.440752163461184,
-              165.27849357639184
+              48.440752163461184,
+              197.27849357639184
             ]
           }
         }
