@@ -38,6 +38,8 @@
 	<string>Filz! can save received photos and videos to your photo library when Save media to gallery is enabled.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
