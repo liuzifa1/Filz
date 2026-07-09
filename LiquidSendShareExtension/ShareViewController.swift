@@ -102,7 +102,7 @@ final class ShareViewController: UIViewController {
     }
 
     private func openMainApp() {
-        guard let url = URL(string: "liquidsend://shared-inbox") else {
+        guard let url = URL(string: "filz://shared-inbox") else {
             complete()
             return
         }

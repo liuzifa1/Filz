@@ -658,11 +658,13 @@ private struct TransferRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if let textMessage, !textMessage.isEmpty {
-                    Text(textMessage)
+                if let textPreview {
+                    Text(textPreview)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 4)
@@ -691,6 +693,21 @@ private struct TransferRow: View {
                 }
             }
         }
+    }
+
+    private var textPreview: String? {
+        guard let textMessage, !textMessage.isEmpty else { return nil }
+        let preview = textMessage.singleLineTransferPreview
+        return preview.isEmpty ? nil : preview
+    }
+}
+
+private extension String {
+    var singleLineTransferPreview: String {
+        components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }
 

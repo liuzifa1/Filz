@@ -101,7 +101,7 @@ struct SettingsFormView: View {
                 // Advanced settings
                 Toggle("Advanced Networking", isOn: $settings.isAdvancedNetworkingOn)
                 if settings.isAdvancedNetworkingOn {
-                    Toggle("Auto accepct share link requests", isOn: $settings.autoAcceptShareLink)
+                    //Toggle("Auto accepct share link requests", isOn: $settings.autoAcceptShareLink)
                     // Device Icon Picker
                     Picker("Device Icon", selection: $settings.selectedDeviceIcon) {
                         ForEach(AppDeviceIcon.allCases) { device in
@@ -168,7 +168,7 @@ struct SettingsFormView: View {
                 HStack {
                     Text("App")
                     Spacer()
-                    Text("0.2.1")
+                    Text("0.2.4")
                         .foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())

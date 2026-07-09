@@ -106,7 +106,7 @@ final class TransferActivityCoordinator {
             completedFiles: progress.completedFiles,
             totalFiles: progress.totalFiles,
             actionHint: actionHint(for: progress.status, direction: direction),
-            deepLink: pendingRequestID.map { "liquidsend://receive/\($0)" } ?? "liquidsend://transfer"
+            deepLink: pendingRequestID.map { "filz://receive/\($0)" } ?? "filz://transfer"
         )
         let newSignature = "\(direction)|\(peerName)|\(state.status)|\(state.transferredBytes)|\(state.totalBytes)|\(state.fileName)"
         guard newSignature != signature else { return }

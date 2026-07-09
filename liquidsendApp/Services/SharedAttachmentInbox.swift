@@ -18,7 +18,7 @@ struct SharedAttachmentImport {
 // imports can run off the main thread without blocking UI.
 nonisolated enum SharedAttachmentInbox {
     static let appGroup = "group.top.kitsune.filz"
-    static let urlScheme = "liquidsend"
+    static let urlScheme = "filz"
     private static let favouritesFileName = "Favourite Devices.json"
     private static let selectionFileName = "Share Selection.json"
     private static let manifestFileName = "Share Manifest.json"
