@@ -47,6 +47,7 @@ struct SettingsFormView: View {
     @State private var identityName = ""
     @State private var showIdentityEditor = false
     @State private var showHistoryDeleteConfirmation = false
+    @State private var photoLibraryPermissionDenied = false
     
     @Bindable var settings: SettingsModel // Import from SwiftData, and make it bindable
     var dismiss: DismissAction // Import dismiss function
@@ -74,6 +75,11 @@ struct SettingsFormView: View {
                         .keyboardType(.numberPad)
                 }
                 Toggle("Save media to gallery", isOn: $settings.saveMediaToGallery)
+                if photoLibraryPermissionDenied {
+                    Text("Photo Library add access is disabled in Settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Toggle("Auto Finish", isOn: $settings.autoFinish)
                 Toggle("Save to history", isOn: $settings.saveToHistory)
                 Button("Delete History", systemImage: "trash", role: .destructive) {
@@ -118,9 +124,9 @@ struct SettingsFormView: View {
                             .foregroundStyle(.secondary)
                             .keyboardType(.numberPad)
                     }
-                    NavigationLink("Interface B/W List") {
-                        Text("Interface B/W List View")
-                    }
+                    //NavigationLink("Interface B/W List") {
+                    //    Text("Interface B/W List View")
+                    //}
                     // Discovery Timeout Picker
                     HStack {
                         Text("Discovery Timeout")
@@ -200,6 +206,11 @@ struct SettingsFormView: View {
                 settings.receivePIN = String(Int.random(in: 100_000...999_999))
             }
             applyReceivePIN()
+            photoLibraryPermissionDenied = MediaLibrarySaver.isPhotoLibraryPermissionDenied
+        }
+        .onChange(of: settings.saveMediaToGallery) { _, enabled in
+            guard enabled else { return }
+            requestPhotoLibraryPermissionForGallerySave()
         }
         .onChange(of: settings.requirePIN) { _, enabled in
             if enabled && settings.receivePIN.isEmpty {
@@ -276,6 +287,16 @@ struct SettingsFormView: View {
 
     private func applyReceivePIN() {
         coreStatus.configureReceivePIN(settings.requirePIN ? settings.receivePIN : nil)
+    }
+
+    private func requestPhotoLibraryPermissionForGallerySave() {
+        Task {
+            let allowed = await MediaLibrarySaver.requestPhotoLibraryAddPermission(markFirstRunPromptHandled: true)
+            photoLibraryPermissionDenied = MediaLibrarySaver.isPhotoLibraryPermissionDenied
+            guard !allowed else { return }
+            settings.saveMediaToGallery = false
+            try? modelContext.save()
+        }
     }
 
     private func toggleAppIcon() {

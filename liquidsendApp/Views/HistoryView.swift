@@ -143,7 +143,12 @@ struct HistoryView: View {
                             } label: {
                                 HistoryRow(entry: entry)
                             }
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            .swipeActions(edge: .leading) {
+                                if hasTransferContentAction(text: entry.textMessage, paths: entry.savedPaths) {
+                                    transferContentButton(text: entry.textMessage, paths: entry.savedPaths)
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button("Delete", systemImage: "trash", role: .destructive) {
                                     delete(entry)
                                 }
@@ -345,7 +350,7 @@ private struct HistoryRow: View {
     }
 }
 
-private struct HistoryDetailView: View {
+struct HistoryDetailView: View {
     let entry: TransferHistoryEntry
 
     var body: some View {
@@ -371,8 +376,8 @@ private struct HistoryDetailView: View {
                 Section("Text") {
                     Text(text)
                         .textSelection(.enabled)
-                    Button("Copy Text", systemImage: "doc.on.doc") {
-                        UIPasteboard.general.string = text
+                    Button("Copy", systemImage: "doc.on.doc") {
+                        TransferClipboard.copy(text: text, paths: [])
                     }
                 }
             } else {
@@ -384,16 +389,20 @@ private struct HistoryDetailView: View {
                             Text(name)
                                 .lineLimit(2)
                             Spacer()
-                            if index < entry.savedPaths.count {
+                            if entry.direction == .received, index < entry.savedPaths.count {
                                 Text(URL(fileURLWithPath: entry.savedPaths[index]).deletingLastPathComponent().lastPathComponent)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
-                    if !entry.savedPaths.isEmpty {
-                        Button("Open in Files", systemImage: "escape") {
-                            FilesLocationOpener.openReceivedFiles()
+                    if let revealPath = FilesLocationOpener.revealablePath(in: entry.savedPaths) {
+                        Button("Jump to", systemImage: "escape") {
+                            FilesLocationOpener.reveal(path: revealPath)
+                        }
+                    } else if TransferClipboard.canCopy(text: nil, paths: entry.savedPaths) {
+                        Button("Copy", systemImage: "doc.on.doc") {
+                            TransferClipboard.copy(text: nil, paths: entry.savedPaths)
                         }
                     }
                 }

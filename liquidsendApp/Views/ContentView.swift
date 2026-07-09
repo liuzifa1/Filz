@@ -28,6 +28,7 @@ struct ContentView: View {
    @State private var attachmentAllowsMultipleDestinations = false
    @State private var selectedTab: MainTab = .send
    @State private var showReceiveDetails = false
+   @State private var showPhotoLibraryPermissionPrompt = false
    
    private var setting: SettingsModel {
            if let existing = settings.first {
@@ -127,6 +128,16 @@ struct ContentView: View {
             }
          }
       }
+      .alert("Auto Add to Photos", isPresented: $showPhotoLibraryPermissionPrompt) {
+         Button("Not Now", role: .cancel) {
+            MediaLibrarySaver.markFirstRunPhotoLibraryPromptHandled()
+         }
+         Button("Allow Access") {
+            requestPhotoLibraryPermissionForAutoAdd()
+         }
+      } message: {
+         Text("Filz can automatically add received photos and videos to your Photos library.")
+      }
       .onChange(of: scenePhase) { _, phase in
          guard phase == .active else { return }
          Task { await importSharedAttachments() }
@@ -138,6 +149,7 @@ struct ContentView: View {
             try? modelContext.save()
          }
          migrateEncryptionDefaultIfNeeded()
+         presentPhotoLibraryPermissionPromptIfNeeded()
          if !coreStatus.isCoreRunning {
             coreStatus.start(
                alias: setting.userName,
@@ -161,6 +173,12 @@ struct ContentView: View {
             )
             coreStatus.configureReceiveOptions(saveMediaToGallery: setting.saveMediaToGallery)
             SharedAttachmentInbox.exportFavouriteDevices(settings: setting, devices: coreStatus.nearbyDevices)
+            FavouriteStore.syncSnapshots(
+               devices: coreStatus.nearbyDevices,
+               favouriteTokens: Set(setting.favouriteDeviceTokens),
+               networkKey: coreStatus.currentNetworkKey,
+               context: modelContext
+            )
             let drafts = coreStatus.drainHistoryDrafts()
             if setting.saveToHistory {
                drafts.forEach { modelContext.insert(TransferHistoryEntry(draft: $0)) }
@@ -170,6 +188,20 @@ struct ContentView: View {
             }
             try? await Task.sleep(for: .seconds(1))
          }
+      }
+   }
+
+   private func presentPhotoLibraryPermissionPromptIfNeeded() {
+      guard MediaLibrarySaver.shouldPromptForPhotoLibraryPermissionOnFirstRun() else { return }
+      showPhotoLibraryPermissionPrompt = true
+   }
+
+   private func requestPhotoLibraryPermissionForAutoAdd() {
+      Task {
+         let allowed = await MediaLibrarySaver.requestPhotoLibraryAddPermission(markFirstRunPromptHandled: true)
+         guard allowed else { return }
+         setting.saveMediaToGallery = true
+         try? modelContext.save()
       }
    }
 
@@ -259,6 +291,6 @@ struct ContentView: View {
 
 #Preview {
    ContentView()
-      .modelContainer(for: [SettingsModel.self, TransferHistoryEntry.self], inMemory: true)
+      .modelContainer(for: [SettingsModel.self, TransferHistoryEntry.self, FavouriteDevice.self], inMemory: true)
       .environment(CoreStatus())
 }

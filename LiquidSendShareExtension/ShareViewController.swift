@@ -2,8 +2,9 @@ import UIKit
 import UniformTypeIdentifiers
 
 // Hands shared items to the main app through the app group: files land in
-// "Share Inbox", and "Share Manifest.json" is written last as the ready signal
-// the app polls for. The app is opened immediately; nothing here blocks on it.
+// "Share Inbox" and "Share Manifest.json" is written last as the ready signal
+// the app imports on launch. Items are materialized first (fast), then the app
+// is launched and this extension tears down immediately.
 final class ShareViewController: UIViewController {
     private let appGroup = "group.top.kitsune.filz"
     private let selectionFileName = "Share Selection.json"
@@ -13,28 +14,11 @@ final class ShareViewController: UIViewController {
     private let statusLabel = UILabel()
     private let activityIndicator = UIActivityIndicatorView(style: .medium)
 
-    private var hostInBackground = false
-    private var itemsFinished = false
     private var didComplete = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
         configureView()
-        // The host app leaving the foreground is the reliable signal that the
-        // jump to Filz! worked; the open calls give no trustworthy callback.
-        NotificationCenter.default.addObserver(
-            forName: .NSExtensionHostDidEnterBackground,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.hostInBackground = true
-                if self.itemsFinished {
-                    self.complete()
-                }
-            }
-        }
         Task { await run() }
     }
 
@@ -74,81 +58,70 @@ final class ShareViewController: UIViewController {
 
     private func run() async {
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
-            finish(message: "Filz! shared storage is unavailable.")
+            fail("Filz! shared storage is unavailable.")
             return
         }
         let providers = (extensionContext?.inputItems as? [NSExtensionItem])?
             .flatMap { $0.attachments ?? [] } ?? []
         guard !providers.isEmpty else {
-            finish(message: "No shared items were provided.")
+            fail("No shared items were provided.")
             return
         }
-
-        statusLabel.text = "Preparing \(providers.count) item\(providers.count == 1 ? "" : "s")..."
 
         let inbox = container.appending(path: "Share Inbox", directoryHint: .isDirectory)
         let manifestURL = container.appending(path: manifestFileName)
         guard await Self.prepareInbox(inbox, staleManifest: manifestURL) else {
-            finish(message: "Could not prepare the Filz! inbox.")
+            fail("Could not prepare the Filz! inbox.")
             return
         }
 
-        // Keep this process alive while the main app takes the foreground. On
-        // expiry, tear down at once: a lingering extension process blocks the
-        // next share-sheet launch.
-        let gate = DispatchSemaphore(value: 0)
-        ProcessInfo.processInfo.performExpiringActivity(withReason: "Finish importing shared items") { [weak self] expired in
-            if expired {
-                gate.signal()
-                DispatchQueue.main.async { self?.complete() }
-            } else {
-                gate.wait()
-            }
-        }
-
-        // Jump to the app immediately; the items land while it opens and the
-        // app polls for the manifest before importing.
         writeJSON(
             ShareSelection(selectedFavouriteIDs: [], openDestinationPicker: true),
             to: container.appending(path: selectionFileName)
         )
-        openMainApp()
 
+        // Materialize items before launching so the manifest is on disk the
+        // instant the app reads it — no polling wait on the app side.
         var savedItems: [SharedManifestItem] = []
-        var finishedCount = 0
-        for provider in providers {
+        for (index, provider) in providers.enumerated() {
+            if providers.count > 1 {
+                statusLabel.text = "Preparing \(index + 1) of \(providers.count) items..."
+            }
             if let item = await Self.save(provider, to: inbox) {
                 savedItems.append(item)
             }
-            finishedCount += 1
-            if providers.count > 1 {
-                statusLabel.text = "Prepared \(finishedCount) of \(providers.count) items..."
-            }
         }
+        guard !savedItems.isEmpty else {
+            fail("Filz! could not read the shared items.")
+            return
+        }
+        writeJSON(SharedManifest(items: savedItems), to: manifestURL)
 
-        if savedItems.isEmpty {
-            statusLabel.text = "Filz! could not read the shared items."
-        } else {
-            writeJSON(SharedManifest(items: savedItems), to: manifestURL)
-            statusLabel.text = "Opening Filz!..."
-        }
-        gate.signal()
-        finish(message: nil)
+        statusLabel.text = "Opening Filz!..."
+        openMainApp()
     }
 
-    // Always tears down shortly: if the jump failed, the app imports the
-    // inbox on its next activation anyway, so waiting on confirmation only
-    // risks leaving a stale process behind.
-    private func finish(message: String?) {
-        if let message {
-            statusLabel.text = message
-            activityIndicator.stopAnimating()
-        }
-        itemsFinished = true
-        if hostInBackground {
+    private func openMainApp() {
+        guard let url = URL(string: "liquidsend://shared-inbox") else {
             complete()
+            return
+        }
+        // The responder-chain UIApplication.open launches the host app
+        // immediately and reliably from an extension. extensionContext.open can
+        // stall for many seconds before doing anything, so it is only a
+        // fallback when no UIApplication is reachable in the chain.
+        if openThroughResponderChain(url) {
+            // Give SpringBoard a beat to start the launch before we dismiss.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                self?.complete()
+            }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            extensionContext?.open(url) { [weak self] _ in
+                DispatchQueue.main.async { self?.complete() }
+            }
+            // If open never calls back (or the app can't launch), tear down
+            // anyway — the files are queued and import on the next launch.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 self?.complete()
             }
         }
@@ -160,18 +133,19 @@ final class ShareViewController: UIViewController {
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
 
-    // MARK: - Opening the main app
-
-    private func openMainApp() {
-        guard let url = URL(string: "liquidsend://shared-inbox") else { return }
-        extensionContext?.open(url, completionHandler: nil)
-        // Some hosts never deliver a useful completion from extensionContext.open.
-        // If the host is still foregrounded shortly after, try the responder chain.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self, !self.hostInBackground, !self.didComplete else { return }
-            _ = self.openThroughResponderChain(url)
+    private func fail(_ message: String) {
+        statusLabel.text = message
+        activityIndicator.stopAnimating()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.extensionContext?.cancelRequest(withError: NSError(
+                domain: "FilzShareExtension",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            ))
         }
     }
+
+    // MARK: - Opening the main app
 
     private func openThroughResponderChain(_ url: URL) -> Bool {
         var responder: UIResponder? = self

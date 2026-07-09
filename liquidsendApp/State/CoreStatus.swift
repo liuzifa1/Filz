@@ -29,12 +29,19 @@ final class CoreStatus {
     var transferMessage: String?
     var transferError: String?
     var pendingReceiveRequest: IncomingLocalSendRequest?
+    // Local source paths of the most recent send, retained so the sent row can
+    // offer Copy while the originals remain readable in our sandbox.
+    var sentSourcePaths: [String] = []
     var sendProgress: LocalSendTransferProgress?
     var receiveProgress: LocalSendTransferProgress?
     private(set) var pendingHistoryDrafts: [TransferHistoryDraft] = []
     private var lastReceiveStatus: String?
     private var lastReceiveRequestID: String?
     private var saveReceivedMediaToGallery = false
+
+    var currentNetworkKey: String {
+        NetworkInterfaceAddresses.networkKey(from: localIPv4Addresses)
+    }
 
     var selectedTotalSize: Int64 {
         selectedFileSizes.values.reduce(0, +)
@@ -194,6 +201,8 @@ final class CoreStatus {
         let textMessage = isTextOnlyTransfer
             ? selectedFileURLs.compactMap { selectedTextPreviews[$0] }.first
             : nil
+        let sourcePaths = isTextOnlyTransfer ? [] : files.map(\.filePath)
+        sentSourcePaths = sourcePaths
 
         let accessedURLs = selectedFileURLs.filter { $0.startAccessingSecurityScopedResource() }
         defer {
@@ -237,6 +246,7 @@ final class CoreStatus {
                         textMessage: textMessage,
                         totalBytes: totalSize,
                         result: .failed,
+                        savedPaths: sourcePaths,
                         errorMessage: error
                     )
                 }
@@ -248,7 +258,8 @@ final class CoreStatus {
                     fileNames: textMessage == nil ? files.map(\.fileName) : [],
                     textMessage: textMessage,
                     totalBytes: totalSize,
-                    result: .completed
+                    result: .completed,
+                    savedPaths: sourcePaths
                 )
             }
         }

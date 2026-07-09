@@ -187,13 +187,21 @@ pub(crate) async fn run(
                     }
 
                     let should_answer = dto.announcement || dto.announce;
-                    record(dto.into_device(source.ip(), port));
+                    let device = dto.into_device(source.ip(), port);
                     if should_answer {
+                        #[cfg(feature = "http")]
+                        respond_with_register(&info, port, &protocol, &device);
                         let _ = socket.send_to(&response, target).await;
                     }
+                    record(device);
                 }
                 Some(()) = refresh_rx.recv() => {
-                    let _ = socket.send_to(&announcement, target).await;
+                    // A manual refresh rebuilds the socket: after Wi-Fi roams,
+                    // backgrounding, or a dropped IGMP membership the old
+                    // socket can be silently dead (no errors, no packets), and
+                    // re-announcing on it goes nowhere. The outer loop
+                    // announces right after the rebuild.
+                    break;
                 }
                 _ = interval.tick() => {
                     let _ = socket.send_to(&announcement, target).await;
@@ -201,6 +209,48 @@ pub(crate) async fn run(
             }
         }
     }
+}
+
+// Official LocalSend answers announcements with an HTTP register call in
+// addition to the multicast response; mirror that so this device stays
+// visible to peers whose multicast receive path is broken (a common cause of
+// one-sided discovery).
+#[cfg(feature = "http")]
+fn respond_with_register(
+    info: &ClientInfo,
+    our_port: u16,
+    our_protocol: &ProtocolType,
+    peer: &DiscoveredDevice,
+) {
+    let payload = RegisterDto {
+        alias: info.alias.clone(),
+        version: info.version.clone(),
+        device_model: info.device_model.clone(),
+        device_type: info.device_type.clone(),
+        token: info.token.clone(),
+        port: our_port,
+        protocol: our_protocol.clone(),
+        has_web_interface: false,
+    };
+    let url = format!(
+        "{}://{}:{}/api/localsend/v2/register",
+        peer.protocol.as_str(),
+        peer.ip,
+        peer.port
+    );
+    tokio::spawn(async move {
+        // Peers use self-signed certificates; the payload only carries the
+        // same public info this device already multicasts in the clear.
+        let Ok(client) = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .connect_timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(5))
+            .build()
+        else {
+            return;
+        };
+        let _ = client.post(url).json(&payload).send().await;
+    });
 }
 
 async fn multicast_socket(port: u16) -> anyhow::Result<tokio::net::UdpSocket> {

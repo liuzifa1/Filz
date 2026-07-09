@@ -19,6 +19,6 @@ struct liquidsendApp: App {
             ContentView()
                 .environment(coreStatus) // import to environment
         }
-        .modelContainer(for: [SettingsModel.self, TransferHistoryEntry.self])
+        .modelContainer(for: [SettingsModel.self, TransferHistoryEntry.self, FavouriteDevice.self])
     }
 }

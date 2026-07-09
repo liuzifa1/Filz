@@ -55,6 +55,9 @@ final class TransferHistoryEntry {
     var resultRaw: String
     var savedPathsData: Data
     var errorMessage: String?
+    // Hidden from the Send tab's recent Transfers section, but still listed in
+    // the full History.
+    var hiddenFromRecents: Bool = false
 
     init(draft: TransferHistoryDraft) {
         id = UUID()

@@ -14,7 +14,9 @@ struct SharedAttachmentImport {
     let openDestinationPicker: Bool
 }
 
-enum SharedAttachmentInbox {
+// File-system work; deliberately not main-actor-isolated so large bookmark
+// imports can run off the main thread without blocking UI.
+nonisolated enum SharedAttachmentInbox {
     static let appGroup = "group.top.kitsune.filz"
     static let urlScheme = "liquidsend"
     private static let favouritesFileName = "Favourite Devices.json"
