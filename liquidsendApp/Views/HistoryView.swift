@@ -87,9 +87,7 @@ struct HistoryView: View {
                     ForEach(activeTransfers) { transfer in
                         NavigationLink {
                             if let request = transfer.request {
-                                IncomingReceiveRequestDetailView(request: request) { accepted in
-                                    coreStatus.decideReceive(accepted: accepted)
-                                }
+                                PendingReceiveRequestDetailView(request: request)
                             } else {
                                 TransferProgressDetailView(direction: transfer.direction, progress: transfer.progress)
                             }

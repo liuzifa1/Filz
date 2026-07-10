@@ -1,6 +1,82 @@
 import SwiftUI
 import UIKit
 
+struct PendingReceiveRequestDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(CoreStatus.self) private var coreStatus
+
+    let request: IncomingLocalSendRequest
+    @State private var didAccept = false
+
+    var body: some View {
+        Group {
+            if didAccept, let progress = acceptedProgress {
+                TransferProgressDetailView(direction: .received, progress: progress)
+                    .transition(.opacity)
+            } else if didAccept {
+                acceptedWaitingView
+                    .transition(.opacity)
+            } else {
+                IncomingReceiveRequestDetailView(request: request, decision: decide)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.snappy(duration: 0.25), value: detailPhase)
+    }
+
+    private var acceptedProgress: LocalSendTransferProgress? {
+        guard let progress = coreStatus.receiveProgress else { return nil }
+        if progress.requestID == request.id {
+            return progress
+        }
+        if progress.requestID == nil, progress.senderAlias == request.senderAlias {
+            return progress
+        }
+        return nil
+    }
+
+    private var detailPhase: String {
+        if !didAccept { return "pending" }
+        return acceptedProgress == nil ? "accepted" : "progress"
+    }
+
+    private var acceptedWaitingView: some View {
+        List {
+            Section("Transfer") {
+                LabeledContent("Status", value: String(localized: "Accepted"))
+                LabeledContent("Device", value: request.senderAlias)
+                LabeledContent("Items", value: request.files.count.formatted())
+                LabeledContent(
+                    "Size",
+                    value: ByteCountFormatter.string(
+                        fromByteCount: Int64(request.totalBytes),
+                        countStyle: .file
+                    )
+                )
+            }
+
+            Section("Progress") {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Waiting for sender...")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .navigationTitle("Transfer Details")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func decide(_ accepted: Bool) {
+        guard coreStatus.decideReceive(accepted: accepted) else { return }
+        if accepted {
+            didAccept = true
+        } else {
+            dismiss()
+        }
+    }
+}
+
 struct IncomingReceiveRequestDetailView: View {
     let request: IncomingLocalSendRequest
     var decision: ((Bool) -> Void)?
@@ -39,6 +115,7 @@ struct IncomingReceiveRequestDetailView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(4)
+                                    .textSelection(.enabled)
                             }
                         }
                         Spacer()

@@ -232,12 +232,18 @@ struct ContentView: View {
       selectedTab = .send
       let textURLs = Set(sharedImport.textPreviews.keys)
       let fileURLs = sharedImport.urls.filter { !textURLs.contains($0) }
-      if !fileURLs.isEmpty {
-         coreStatus.addFiles(fileURLs)
-      }
-      for url in sharedImport.urls {
-         if let preview = sharedImport.textPreviews[url] {
-            coreStatus.addTextFile(url, preview: preview)
+      if fileURLs.isEmpty,
+         sharedImport.textPreviews.count == 1,
+         let textItem = sharedImport.textPreviews.first {
+         coreStatus.selectTextMessage(textItem.key, preview: textItem.value)
+      } else {
+         if !fileURLs.isEmpty {
+            coreStatus.addFiles(fileURLs)
+         }
+         for url in sharedImport.urls {
+            if let preview = sharedImport.textPreviews[url] {
+               coreStatus.addTextFile(url, preview: preview)
+            }
          }
       }
       coreStatus.clearDestinations()

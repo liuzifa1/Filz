@@ -308,11 +308,13 @@ struct SettingsFormView: View {
 private struct FavouriteDevicesView: View {
     @Bindable var settings: SettingsModel
     let devices: [LocalSendDevice]
+    private let listAnimation = Animation.snappy(duration: 0.3)
 
     var body: some View {
         List {
             if settings.favouriteDeviceTokens.isEmpty {
                 ContentUnavailableView("No Favourites", systemImage: "star")
+                    .transition(.opacity)
             } else {
                 ForEach(settings.favouriteDeviceTokens, id: \.self) { fingerprint in
                     let device = devices.first { $0.id == fingerprint || $0.token == fingerprint }
@@ -341,18 +343,24 @@ private struct FavouriteDevicesView: View {
                     }
                     .swipeActions {
                         Button("Remove", systemImage: "star.slash", role: .destructive) {
-                            settings.favouriteDeviceTokens.removeAll { $0 == fingerprint }
+                            withAnimation(listAnimation) {
+                                settings.favouriteDeviceTokens.removeAll { $0 == fingerprint }
+                            }
                         }
                     }
                 }
 
                 Section {
                     Button("Clear Favourites", systemImage: "star.slash", role: .destructive) {
-                        settings.favouriteDeviceTokens.removeAll()
+                        withAnimation(listAnimation) {
+                            settings.favouriteDeviceTokens.removeAll()
+                        }
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(listAnimation, value: settings.favouriteDeviceTokens)
         .navigationTitle("Favourites")
         .navigationBarTitleDisplayMode(.inline)
     }

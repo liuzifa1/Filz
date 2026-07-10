@@ -100,6 +100,16 @@ final class CoreStatus {
         selectedTextPreviews[url] = preview
     }
 
+    func selectTextMessage(_ url: URL, preview: String) {
+        // LocalSend recognizes an instant text message only when it is the
+        // sole text/* item and carries a non-empty preview.
+        selectedFileURLs = [url]
+        selectedFileSizes = [url: fileSize(for: url)]
+        selectedTextPreviews = [url: preview]
+        transferMessage = nil
+        transferError = nil
+    }
+
     func clearSelectedFile() {
         guard !isSending else { return }
         selectedFileURLs = []
@@ -411,16 +421,21 @@ final class CoreStatus {
         )
     }
 
-    func decideReceive(accepted: Bool) {
-        guard let request = pendingReceiveRequest else { return }
+    @discardableResult
+    func decideReceive(accepted: Bool) -> Bool {
+        guard let request = pendingReceiveRequest else { return false }
         let error = LocalSendCoreClient.decideReceive(requestID: request.id, accepted: accepted)
         if let error {
             transferError = error
+            return false
         } else {
             pendingReceiveRequest = nil
+            transferError = nil
             transferMessage = accepted
                 ? String(localized: "Receiving \(request.files.count) items from \(request.senderAlias)...")
                 : String(localized: "Declined files from \(request.senderAlias).")
+            refresh()
+            return true
         }
     }
 

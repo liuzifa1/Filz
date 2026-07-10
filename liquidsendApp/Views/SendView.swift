@@ -22,6 +22,7 @@ struct SendView: View {
 
     private let activeSendStatuses = ["waiting", "sending"]
     private let activeReceiveStatuses = ["waiting", "approved", "receiving"]
+    private let sectionAnimation = Animation.snappy(duration: 0.3)
 
     // Body
     var body: some View {
@@ -128,11 +129,17 @@ struct SendView: View {
                             .foregroundStyle(.red)
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
             transfersSection
             favouritesSection
             nearbyDevicesSection
         }
+        .animation(sectionAnimation, value: coreSectionAnimationKey)
+        .animation(sectionAnimation, value: selectedSectionAnimationKey)
+        .animation(sectionAnimation, value: transferSectionAnimationKey)
+        .animation(sectionAnimation, value: favouriteSectionAnimationKey)
+        .animation(sectionAnimation, value: nearbySectionAnimationKey)
         .refreshable {
             coreStatus.refreshDiscovery()
             try? await Task.sleep(for: .milliseconds(500))
@@ -147,6 +154,38 @@ struct SendView: View {
         guard !coreStatus.localIPv4Addresses.isEmpty else { return String(localized: "IP unavailable") }
         let port = coreStatus.activePort ?? UInt16(settingsList.first?.port ?? "") ?? 53317
         return coreStatus.localIPv4Addresses.map { "\($0):\(port)" }.joined(separator: "  ")
+    }
+
+    private var coreSectionAnimationKey: String {
+        [
+            coreStatus.isCoreRunning ? "running" : "stopped",
+            coreStatus.activeProtocol,
+            coreStatus.activePort.map { String($0) } ?? "",
+            coreStatus.receivePIN ?? "",
+            coreStatus.localIPv4Addresses.joined(separator: ",")
+        ].joined(separator: "|")
+    }
+
+    private var selectedSectionAnimationKey: [String] {
+        [
+            hasSendingTask ? "sending" : "idle",
+            coreStatus.transferMessage ?? "",
+            coreStatus.transferError ?? ""
+        ] + coreStatus.selectedFileURLs.map(\.path)
+    }
+
+    private var transferSectionAnimationKey: [String] {
+        transferItems.map(\.animationKey)
+    }
+
+    private var favouriteSectionAnimationKey: [String] {
+        networkFavourites.map { favourite in
+            "\(favourite.token)|\(nearbyByToken[favourite.token] != nil)"
+        }
+    }
+
+    private var nearbySectionAnimationKey: [String] {
+        sortedNearbyDevices.map(\.id)
     }
 
     // MARK: Favourites
@@ -207,6 +246,7 @@ struct SendView: View {
                     }
                 }
             }
+            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
@@ -322,6 +362,17 @@ struct SendView: View {
             case .history(let entry): "history-\(entry.id.uuidString)"
             }
         }
+
+        var animationKey: String {
+            switch self {
+            case .pending:
+                return id
+            case .receive(let progress), .send(let progress):
+                return "\(id)|\(progress.status)|\(progress.error ?? "")"
+            case .history(let entry):
+                return "\(id)|\(entry.hiddenFromRecents)"
+            }
+        }
     }
 
     // Active transfers come live from the core (keeping their accept/cancel
@@ -360,6 +411,7 @@ struct SendView: View {
                     transferRow(for: item)
                 }
             }
+            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
@@ -368,9 +420,7 @@ struct SendView: View {
         switch item {
         case .pending(let request):
             NavigationLink {
-                IncomingReceiveRequestDetailView(request: request) { accepted in
-                    coreStatus.decideReceive(accepted: accepted)
-                }
+                PendingReceiveRequestDetailView(request: request)
             } label: {
                 TransferRow(
                     direction: .receive,
@@ -648,17 +698,12 @@ private struct TransferRow: View {
                 }
                 if let textPreview {
                     Text(textPreview)
-                        .font(.callout)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 } else if let fraction {
                     ProgressView(value: fraction)
                         .animation(.linear(duration: 0.25), value: fraction)

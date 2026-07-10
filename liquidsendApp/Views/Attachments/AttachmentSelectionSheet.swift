@@ -97,7 +97,7 @@ struct AttachmentSelectionSheet: View {
             }
             .sheet(isPresented: $showTextComposer) {
                 TextTransferComposer { url, preview in
-                    coreStatus.addTextFile(url, preview: preview)
+                    coreStatus.selectTextMessage(url, preview: preview)
                 }
             }
             .sheet(isPresented: $showDestinationPicker) {
