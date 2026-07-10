@@ -15,7 +15,7 @@ final class TransferActivityCoordinator {
         Task {
             let state = TransferActivityAttributes.ContentState(
                 status: "canceled",
-                fileName: "Transfer canceled",
+                fileName: String(localized: "Transfer canceled"),
                 transferredBytes: 0,
                 totalBytes: 0,
                 completedFiles: 0,
@@ -57,7 +57,7 @@ final class TransferActivityCoordinator {
                 senderPort: pendingReceive.senderPort,
                 senderProtocol: pendingReceive.senderProtocol,
                 senderFingerprint: pendingReceive.senderFingerprint,
-                currentFile: "Approval needed",
+                currentFile: String(localized: "Approval needed"),
                 sentBytes: nil,
                 receivedBytes: 0,
                 totalBytes: pendingReceive.totalBytes,
@@ -67,28 +67,28 @@ final class TransferActivityCoordinator {
                 textMessage: pendingReceive.textMessage,
                 error: nil
             )
-            direction = "Receiving"
+            direction = "receiving"
             peerName = pendingReceive.senderAlias
             pendingRequestID = pendingReceive.id
         } else if let receive, ["waiting", "approved", "receiving"].contains(receive.status) {
             progress = receive
-            direction = "Receiving"
-            peerName = receive.senderAlias ?? "LocalSend device"
+            direction = "receiving"
+            peerName = receive.senderAlias ?? String(localized: "LocalSend device")
             pendingRequestID = receive.status == "waiting" ? receive.requestID : nil
         } else if let send, ["waiting", "sending"].contains(send.status) {
             progress = send
-            direction = "Sending"
-            peerName = send.targetAlias ?? "LocalSend device"
+            direction = "sending"
+            peerName = send.targetAlias ?? String(localized: "LocalSend device")
             pendingRequestID = nil
-        } else if activity?.attributes.direction == "Receiving", let receive {
+        } else if activity?.attributes.direction == "receiving", let receive {
             progress = receive
-            direction = "Receiving"
-            peerName = receive.senderAlias ?? "LocalSend device"
+            direction = "receiving"
+            peerName = receive.senderAlias ?? String(localized: "LocalSend device")
             pendingRequestID = nil
         } else if activity != nil, let send {
             progress = send
-            direction = "Sending"
-            peerName = send.targetAlias ?? "LocalSend device"
+            direction = "sending"
+            peerName = send.targetAlias ?? String(localized: "LocalSend device")
             pendingRequestID = nil
         } else {
             if activity != nil || !Activity<TransferActivityAttributes>.activities.isEmpty {
@@ -100,7 +100,9 @@ final class TransferActivityCoordinator {
         guard let progress else { return }
         let state = TransferActivityAttributes.ContentState(
             status: progress.status,
-            fileName: progress.currentFile ?? (progress.status == "finished" ? "Transfer complete" : "Preparing transfer"),
+            fileName: progress.currentFile ?? (progress.status == "finished"
+                ? String(localized: "Transfer complete")
+                : String(localized: "Preparing transfer")),
             transferredBytes: progress.transferredBytes,
             totalBytes: progress.totalBytes,
             completedFiles: progress.completedFiles,
@@ -154,11 +156,11 @@ final class TransferActivityCoordinator {
     }
 
     private func actionHint(for status: String, direction: String) -> String? {
-        if direction == "Receiving" && status == "waiting" {
-            return "Tap to review"
+        if direction == "receiving" && status == "waiting" {
+            return String(localized: "Tap to review")
         }
-        if direction == "Receiving" && status == "approved" {
-            return "Waiting for upload"
+        if direction == "receiving" && status == "approved" {
+            return String(localized: "Waiting for upload")
         }
         return nil
     }

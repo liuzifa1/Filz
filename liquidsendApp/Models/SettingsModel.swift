@@ -20,11 +20,11 @@ enum AppDeviceIcon: String, CaseIterable, Identifiable, Codable {
     // Title for each case
     var title: String {
         switch self {
-        case .iphone: return "iPhone"
-        case .pc: return "PC"
-        case .browser: return "Browser"
-        case .cli: return "CLI"
-        case .server: return "Server"
+        case .iphone: return String(localized: "iPhone")
+        case .pc: return String(localized: "PC")
+        case .browser: return String(localized: "Browser")
+        case .cli: return String(localized: "CLI")
+        case .server: return String(localized: "Server")
         }
     }
     

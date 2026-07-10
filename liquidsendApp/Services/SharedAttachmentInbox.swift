@@ -69,7 +69,7 @@ nonisolated enum SharedAttachmentInbox {
             let device = devices.first { $0.id == token || $0.token == token }
             return SharedFavouriteDevice(
                 id: token,
-                alias: device?.alias ?? "Saved Device",
+                alias: device?.alias ?? String(localized: "Saved Device"),
                 endpoint: device?.endpoint ?? token,
                 systemImage: device?.systemImage ?? "desktopcomputer"
             )

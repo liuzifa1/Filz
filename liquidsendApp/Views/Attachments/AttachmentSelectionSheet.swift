@@ -267,12 +267,12 @@ struct AttachmentSelectionSheet: View {
                 urls.append(url)
             }
             if urls.isEmpty {
-                coreStatus.transferError = "The selected photos could not be loaded."
+                coreStatus.transferError = String(localized: "The selected photos could not be loaded.")
             } else {
                 coreStatus.addFiles(urls)
             }
         } catch {
-            coreStatus.transferError = "Could not prepare photos: \(error.localizedDescription)"
+            coreStatus.transferError = String(localized: "Could not prepare photos: \(error.localizedDescription)")
         }
     }
 

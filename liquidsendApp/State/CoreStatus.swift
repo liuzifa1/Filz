@@ -150,15 +150,15 @@ final class CoreStatus {
     @discardableResult
     func validateSendPreconditions(portText: String) -> Bool {
         guard !selectedFileURLs.isEmpty else {
-            transferError = "Add one or more attachments before sending."
+            transferError = String(localized: "Add one or more attachments before sending.")
             return false
         }
         guard !selectedDevices.isEmpty else {
-            transferError = "Choose at least one destination."
+            transferError = String(localized: "Choose at least one destination.")
             return false
         }
         guard (UInt16(portText) ?? 0) > 0 else {
-            transferError = "Enter a valid local server port in Settings."
+            transferError = String(localized: "Enter a valid local server port in Settings.")
             return false
         }
         return true
@@ -179,7 +179,7 @@ final class CoreStatus {
 
         isSending = true
         transferError = nil
-        transferMessage = "Preparing \(selectedFileURLs.count) item(s) for \(selectedDevices.count) destination(s)..."
+        transferMessage = String(localized: "Preparing \(selectedFileURLs.count) items for \(selectedDevices.count) destinations...")
 
         let files = selectedFileURLs.map { fileURL in
             LocalSendFile(
@@ -191,7 +191,7 @@ final class CoreStatus {
             )
         }
         let senderToken = LocalSendCoreClient.identityToken
-        let senderAlias = alias.isEmpty ? "LiquidSend" : alias
+        let senderAlias = alias.isEmpty ? "Filz!" : alias
         let senderProtocol = activeProtocol
         let senderModel = deviceModel.isEmpty ? "iPhone" : deviceModel
         let senderDeviceType = deviceIcon.coreDeviceType
@@ -213,7 +213,7 @@ final class CoreStatus {
         var failureMessages: [String] = []
 
         for device in selectedDevices {
-            transferMessage = "Waiting for \(device.alias) to accept..."
+            transferMessage = String(localized: "Waiting for \(device.alias) to accept...")
             let devicePIN = device.pin?.trimmingCharacters(in: .whitespacesAndNewlines)
             let sharedPIN = transferPIN.trimmingCharacters(in: .whitespacesAndNewlines)
             let pin = devicePIN?.isEmpty == false ? devicePIN : (sharedPIN.isEmpty ? nil : sharedPIN)
@@ -266,15 +266,15 @@ final class CoreStatus {
 
         isSending = false
         if LocalSendCoreClient.sendProgress?.status == "canceled" {
-            transferMessage = "Send canceled."
+            transferMessage = String(localized: "Send canceled.")
             transferError = nil
             refresh()
             return
         }
         if failedDevices.isEmpty {
             transferMessage = isTextOnlyTransfer
-                ? "Sent"
-                : "Sent \(files.count) item(s) to \(selectedDevices.count) destination(s)."
+                ? String(localized: "Sent")
+                : String(localized: "Sent \(files.count) items to \(selectedDevices.count) destinations.")
             transferError = nil
             selectedFileURLs = []
             selectedFileSizes = [:]
@@ -313,7 +313,7 @@ final class CoreStatus {
     func cancelSend() {
         guard isSending || ["waiting", "sending"].contains(sendProgress?.status) else { return }
         LocalSendCoreClient.cancelSend()
-        transferMessage = "Send canceled."
+        transferMessage = String(localized: "Send canceled.")
         transferError = nil
         TransferActivityCoordinator.shared.cancelCurrent()
         refresh()
@@ -323,7 +323,7 @@ final class CoreStatus {
         guard pendingReceiveRequest != nil || ["waiting", "approved", "receiving"].contains(receiveProgress?.status) else { return }
         LocalSendCoreClient.cancelReceive()
         pendingReceiveRequest = nil
-        transferMessage = "Receive canceled."
+        transferMessage = String(localized: "Receive canceled.")
         transferError = nil
         TransferActivityCoordinator.shared.cancelCurrent()
         refresh()
@@ -373,7 +373,7 @@ final class CoreStatus {
         }
         enqueueHistory(
             direction: .received,
-            peerName: progress.senderAlias ?? "LocalSend device",
+            peerName: progress.senderAlias ?? String(localized: "LocalSend device"),
             peerFingerprint: progress.senderFingerprint,
             fileNames: progress.textMessage == nil ? paths.map { URL(fileURLWithPath: $0).lastPathComponent } : [],
             textMessage: progress.textMessage,
@@ -419,8 +419,8 @@ final class CoreStatus {
         } else {
             pendingReceiveRequest = nil
             transferMessage = accepted
-                ? "Receiving \(request.files.count) item(s) from \(request.senderAlias)..."
-                : "Declined files from \(request.senderAlias)."
+                ? String(localized: "Receiving \(request.files.count) items from \(request.senderAlias)...")
+                : String(localized: "Declined files from \(request.senderAlias).")
         }
     }
 
@@ -430,7 +430,9 @@ final class CoreStatus {
             transferError = error
         } else {
             pendingReceiveRequest = nil
-            transferMessage = accepted ? "Receiving files..." : "Declined receive request."
+            transferMessage = accepted
+                ? String(localized: "Receiving files...")
+                : String(localized: "Declined receive request.")
             refresh()
         }
     }
@@ -445,7 +447,7 @@ final class CoreStatus {
         receivePIN: String? = nil
     ) -> Bool {
         guard let port = UInt16(portText), port > 0 else {
-            lastError = "Enter a valid port between 1 and 65535."
+            lastError = String(localized: "Enter a valid port between 1 and 65535.")
             return false
         }
 
@@ -459,7 +461,7 @@ final class CoreStatus {
 
         let error = LocalSendCoreClient.startServer(
             port: port,
-            alias: alias.isEmpty ? "LiquidSend" : alias,
+            alias: alias.isEmpty ? "Filz!" : alias,
             deviceModel: deviceModel.isEmpty ? "iPhone" : deviceModel,
             deviceType: deviceIcon.coreDeviceType,
             useTLS: useEncryption

@@ -20,7 +20,7 @@ enum LocalSendCoreClient {
 
     static var version: String {
         guard let versionPointer = localsendcore_version() else {
-            return "Unavailable"
+            return String(localized: "Unavailable")
         }
 
         return String(cString: versionPointer)
@@ -68,7 +68,7 @@ enum LocalSendCoreClient {
             }
         }
 
-        return result == 0 ? nil : lastError ?? "Unable to start LocalSend Core"
+        return result == 0 ? nil : lastError ?? String(localized: "Unable to start LocalSend Core")
     }
 
     nonisolated private static func configureTLSIdentity(commonName: String) -> String? {
@@ -81,7 +81,7 @@ enum LocalSendCoreClient {
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
         } catch {
-            return "Unable to create the TLS identity directory: \(error.localizedDescription)"
+            return String(localized: "Unable to create the TLS identity directory: \(error.localizedDescription)")
         }
 
         let result = directory.path.withCString { directoryPointer in
@@ -101,7 +101,9 @@ enum LocalSendCoreClient {
                 )
             }
         }
-        return result == 0 ? nil : consumeLastError(fallback: "Unable to configure HTTPS identity")
+        return result == 0 ? nil : consumeLastError(
+            fallback: String(localized: "Unable to configure HTTPS identity")
+        )
     }
 
     static func stopServer() {
@@ -112,7 +114,7 @@ enum LocalSendCoreClient {
         let result = url.path.withCString { path in
             localsendcore_set_receive_directory(path)
         }
-        return result == 0 ? nil : lastError ?? "Unable to configure receive directory"
+        return result == 0 ? nil : lastError ?? String(localized: "Unable to configure receive directory")
     }
 
     static func configureReceivePIN(_ pin: String?) -> String? {
@@ -122,7 +124,7 @@ enum LocalSendCoreClient {
         } else {
             result = localsendcore_set_receive_pin(nil)
         }
-        return result == 0 ? nil : lastError ?? "Unable to configure receive PIN"
+        return result == 0 ? nil : lastError ?? String(localized: "Unable to configure receive PIN")
     }
 
     static var identityToken: String {
@@ -175,7 +177,7 @@ enum LocalSendCoreClient {
         }
 
         guard result != 0 else { return nil }
-        return consumeLastError(fallback: "Unable to send file")
+        return consumeLastError(fallback: String(localized: "Unable to send file"))
     }
 
     nonisolated static func sendFiles(
@@ -195,7 +197,7 @@ enum LocalSendCoreClient {
         }
         guard let data = try? JSONEncoder().encode(files),
               let filesJSON = String(data: data, encoding: .utf8) else {
-            return "Unable to encode selected files"
+            return String(localized: "Unable to encode selected files")
         }
         let result: Int32 = device.ip.withCString { targetIP in
             device.protocol.withCString { targetProtocol in
@@ -230,7 +232,7 @@ enum LocalSendCoreClient {
             }
         }
         guard result != 0 else { return nil }
-        return consumeLastError(fallback: "Unable to send files")
+        return consumeLastError(fallback: String(localized: "Unable to send files"))
     }
 
     nonisolated private static func withOptionalCString<T>(
@@ -266,7 +268,7 @@ enum LocalSendCoreClient {
         let result = requestID.withCString { requestID in
             localsendcore_decide_receive(requestID, accepted)
         }
-        return result == 0 ? nil : lastError ?? "Unable to answer receive request"
+        return result == 0 ? nil : lastError ?? String(localized: "Unable to answer receive request")
     }
 
     static func cancelSend() {

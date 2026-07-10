@@ -25,11 +25,11 @@ final class ShareViewController: UIViewController {
     private func configureView() {
         view.backgroundColor = .systemBackground
 
-        titleLabel.text = "Opening Filz!"
+        titleLabel.text = String(localized: "Opening Filz!")
         titleLabel.font = .preferredFont(forTextStyle: .title2)
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        statusLabel.text = "Preparing shared items..."
+        statusLabel.text = String(localized: "Preparing shared items...")
         statusLabel.font = .preferredFont(forTextStyle: .subheadline)
         statusLabel.textColor = .secondaryLabel
         statusLabel.numberOfLines = 0
@@ -58,20 +58,20 @@ final class ShareViewController: UIViewController {
 
     private func run() async {
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
-            fail("Filz! shared storage is unavailable.")
+            fail(String(localized: "Filz! shared storage is unavailable."))
             return
         }
         let providers = (extensionContext?.inputItems as? [NSExtensionItem])?
             .flatMap { $0.attachments ?? [] } ?? []
         guard !providers.isEmpty else {
-            fail("No shared items were provided.")
+            fail(String(localized: "No shared items were provided."))
             return
         }
 
         let inbox = container.appending(path: "Share Inbox", directoryHint: .isDirectory)
         let manifestURL = container.appending(path: manifestFileName)
         guard await Self.prepareInbox(inbox, staleManifest: manifestURL) else {
-            fail("Could not prepare the Filz! inbox.")
+            fail(String(localized: "Could not prepare the Filz! inbox."))
             return
         }
 
@@ -85,19 +85,19 @@ final class ShareViewController: UIViewController {
         var savedItems: [SharedManifestItem] = []
         for (index, provider) in providers.enumerated() {
             if providers.count > 1 {
-                statusLabel.text = "Preparing \(index + 1) of \(providers.count) items..."
+                statusLabel.text = String(localized: "Preparing \(index + 1) of \(providers.count) items...")
             }
             if let item = await Self.save(provider, to: inbox) {
                 savedItems.append(item)
             }
         }
         guard !savedItems.isEmpty else {
-            fail("Filz! could not read the shared items.")
+            fail(String(localized: "Filz! could not read the shared items."))
             return
         }
         writeJSON(SharedManifest(items: savedItems), to: manifestURL)
 
-        statusLabel.text = "Opening Filz!..."
+        statusLabel.text = String(localized: "Opening Filz!...")
         openMainApp()
     }
 
@@ -259,7 +259,9 @@ final class ShareViewController: UIViewController {
     }
 
     nonisolated private static func importFile(at source: URL, to directory: URL) -> SharedManifestItem? {
-        let sourceName = source.lastPathComponent.isEmpty ? "Shared Item" : source.lastPathComponent
+        let sourceName = source.lastPathComponent.isEmpty
+            ? String(localized: "Shared Item")
+            : source.lastPathComponent
         let destinationName = "\(UUID().uuidString)-\(sourceName)"
         let destination = directory.appending(path: destinationName)
         let didAccess = source.startAccessingSecurityScopedResource()
@@ -283,7 +285,7 @@ final class ShareViewController: UIViewController {
     }
 
     nonisolated private static func writeText(_ text: String, to directory: URL) -> SharedManifestItem? {
-        let destinationName = "Shared Text-\(UUID().uuidString).txt"
+        let destinationName = "\(String(localized: "Shared Text"))-\(UUID().uuidString).txt"
         let destination = directory.appending(path: destinationName)
         do {
             try text.write(to: destination, atomically: true, encoding: .utf8)

@@ -35,7 +35,7 @@ private struct LiquidSendTransferStatusWidget: Widget {
                 Image(systemName: "paperplane.fill")
                     .font(.title2)
                     .foregroundStyle(.cyan)
-                Text("LiquidSend")
+                Text("Filz!")
                     .font(.headline)
                 Text("Transfer status appears in Live Activities.")
                     .font(.caption)
@@ -43,7 +43,7 @@ private struct LiquidSendTransferStatusWidget: Widget {
             }
             .containerBackground(.black, for: .widget)
         }
-        .configurationDisplayName("LiquidSend")
+        .configurationDisplayName("Filz!")
         .description("Shows transfer status while sending or receiving.")
         .supportedFamilies([.systemSmall])
     }
@@ -54,7 +54,7 @@ struct LiquidSendTransferLiveActivity: Widget {
         ActivityConfiguration(for: TransferActivityAttributes.self) { context in
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label(context.attributes.direction, systemImage: directionIcon(context.attributes.direction))
+                    Label(directionTitle(context.attributes.direction), systemImage: directionIcon(context.attributes.direction))
                         .font(.headline)
                     Spacer()
                     Text(percent(context.state.fractionCompleted))
@@ -81,7 +81,7 @@ struct LiquidSendTransferLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.attributes.direction, systemImage: directionIcon(context.attributes.direction))
+                    Label(directionTitle(context.attributes.direction), systemImage: directionIcon(context.attributes.direction))
                         .font(.caption.bold())
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -117,11 +117,17 @@ struct LiquidSendTransferLiveActivity: Widget {
     }
 
     private func deepLink(_ context: ActivityViewContext<TransferActivityAttributes>) -> URL? {
-        URL(string: context.state.deepLink ?? "liquidsend://transfer")
+        URL(string: context.state.deepLink ?? "filz://transfer")
     }
 
     private func directionIcon(_ direction: String) -> String {
-        direction == "Receiving" ? "arrow.down" : "arrow.up"
+        direction == "receiving" ? "arrow.down" : "arrow.up"
+    }
+
+    private func directionTitle(_ direction: String) -> String {
+        direction == "receiving"
+            ? String(localized: "Receiving")
+            : String(localized: "Sending")
     }
 
     private func percent(_ fraction: Double) -> String {

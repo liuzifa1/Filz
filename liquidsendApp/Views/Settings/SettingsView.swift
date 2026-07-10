@@ -318,7 +318,10 @@ private struct FavouriteDevicesView: View {
                     let device = devices.first { $0.id == fingerprint || $0.token == fingerprint }
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Label(device?.alias ?? "Saved Device", systemImage: device?.systemImage ?? "desktopcomputer")
+                            Label(
+                                device?.alias ?? String(localized: "Saved Device"),
+                                systemImage: device?.systemImage ?? "desktopcomputer"
+                            )
                             Spacer()
                             if let protocolName = device?.protocol {
                                 Text(protocolName.uppercased())

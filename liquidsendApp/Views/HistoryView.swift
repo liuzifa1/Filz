@@ -9,7 +9,14 @@ private enum HistoryFilter: String, CaseIterable, Identifiable {
     case failed
 
     var id: Self { self }
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .all: String(localized: "All")
+        case .sent: String(localized: "Sent")
+        case .received: String(localized: "Received")
+        case .failed: String(localized: "Failed")
+        }
+    }
 }
 
 struct HistoryView: View {
@@ -229,8 +236,8 @@ private struct ActiveTransfer: Identifiable {
     var id: String { request?.id ?? direction.rawValue }
     var peerName: String {
         switch direction {
-        case .sent: progress.targetAlias ?? "LocalSend device"
-        case .received: progress.senderAlias ?? "LocalSend device"
+        case .sent: progress.targetAlias ?? String(localized: "LocalSend device")
+        case .received: progress.senderAlias ?? String(localized: "LocalSend device")
         }
     }
 }
@@ -243,7 +250,7 @@ private struct HistoryTimeGroup: Identifiable {
     }
 
     var title: String {
-        guard let first = entries.first else { return "Transfers" }
+        guard let first = entries.first else { return String(localized: "Transfers") }
         if entries.count == 1 {
             return first.timestamp.formatted(date: .abbreviated, time: .shortened)
         }
@@ -265,7 +272,7 @@ private struct ActiveTransferRow: View {
                 HStack {
                     Text(transfer.peerName).font(.headline)
                     Spacer()
-                    Text(transfer.progress.status.capitalized)
+                    Text(transfer.progress.localizedStatus)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -303,13 +310,13 @@ private struct ActiveTransferRow: View {
         }
         switch (transfer.direction, transfer.progress.status) {
         case (.received, "waiting"):
-            return "Approval required in Send"
+            return String(localized: "Approval required in Send")
         case (.received, "approved"):
-            return "Accepted; waiting for upload"
+            return String(localized: "Accepted; waiting for upload")
         case (.sent, "waiting"):
-            return "Waiting for recipient approval"
+            return String(localized: "Waiting for recipient approval")
         default:
-            return transfer.progress.status.capitalized
+            return transfer.progress.localizedStatus
         }
     }
 }
@@ -370,7 +377,7 @@ struct HistoryDetailView: View {
                 }
                 LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: entry.totalBytes, countStyle: .file))
                 LabeledContent("Date", value: entry.timestamp.formatted(date: .abbreviated, time: .shortened))
-                LabeledContent("Status", value: entry.result.rawValue.capitalized)
+                LabeledContent("Status", value: entry.result.title)
             }
             if let text = entry.textMessage, !text.isEmpty {
                 Section("Text") {

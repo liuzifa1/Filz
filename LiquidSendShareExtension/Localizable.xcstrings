@@ -1,0 +1,172 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Could not prepare the Filz! inbox.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!の受信ボックスを準備できませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法准备 Filz! 收件箱。"
+          }
+        }
+      }
+    },
+    "Filz! could not read the shared items.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!は共有された項目を読み込めませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz! 无法读取共享的项目。"
+          }
+        }
+      }
+    },
+    "Filz! shared storage is unavailable.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!の共有ストレージを利用できません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz! 共享存储不可用。"
+          }
+        }
+      }
+    },
+    "No shared items were provided.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有する項目がありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有提供可共享的项目。"
+          }
+        }
+      }
+    },
+    "Opening Filz!": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!を開いています"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在打开 Filz!"
+          }
+        }
+      }
+    },
+    "Opening Filz!...": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!を開いています…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在打开 Filz!…"
+          }
+        }
+      }
+    },
+    "Preparing %lld of %lld items...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Preparing %1$lld of %2$lld items..."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld項目を準備中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备第 %lld 个项目，共 %lld 个…"
+          }
+        }
+      }
+    },
+    "Preparing shared items...": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有項目を準備中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备共享项目…"
+          }
+        }
+      }
+    },
+    "Shared Item": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共享项目"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有項目"
+          }
+        }
+      }
+    },
+    "Shared Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共享文本"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有テキスト"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

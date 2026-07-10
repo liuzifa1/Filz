@@ -33,7 +33,7 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>LiquidSend uses your local network to discover nearby devices and transfer files.</string>
+	<string>Filz! uses your local network to discover nearby devices and transfer files.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Filz! can save received photos and videos to your photo library when Save media to gallery is enabled.</string>
 	<key>NSSupportsLiveActivities</key>

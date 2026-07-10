@@ -144,7 +144,7 @@ struct SendView: View {
     }
 
     private var addressSummary: String {
-        guard !coreStatus.localIPv4Addresses.isEmpty else { return "IP unavailable" }
+        guard !coreStatus.localIPv4Addresses.isEmpty else { return String(localized: "IP unavailable") }
         let port = coreStatus.activePort ?? UInt16(settingsList.first?.port ?? "") ?? 53317
         return coreStatus.localIPv4Addresses.map { "\($0):\(port)" }.joined(separator: "  ")
     }
@@ -402,7 +402,7 @@ struct SendView: View {
             } label: {
                 TransferRow(
                     direction: .receive,
-                    title: progress.senderAlias ?? "LocalSend device",
+                    title: progress.senderAlias ?? String(localized: "LocalSend device"),
                     status: receiveStatusText(progress),
                     detail: transferDetailText(progress),
                     fraction: progress.fractionCompleted,
@@ -445,7 +445,7 @@ struct SendView: View {
             } label: {
                 TransferRow(
                     direction: .send,
-                    title: progress.targetAlias ?? "LocalSend device",
+                    title: progress.targetAlias ?? String(localized: "LocalSend device"),
                     status: sendStatusText(progress),
                     detail: transferDetailText(progress),
                     fraction: progress.fractionCompleted,
@@ -505,8 +505,8 @@ struct SendView: View {
     }
 
     private func historyStatusText(_ entry: TransferHistoryEntry) -> String {
-        if entry.result == .failed { return "Failed" }
-        return entry.direction == .sent ? "Sent" : "Received"
+        if entry.result == .failed { return entry.result.title }
+        return entry.direction.title
     }
 
     private func historyIcon(_ entry: TransferHistoryEntry) -> String {
@@ -518,7 +518,7 @@ struct SendView: View {
     }
 
     private func historyDetailText(_ entry: TransferHistoryEntry) -> String {
-        if let text = entry.textMessage, !text.isEmpty { return "Text" }
+        if let text = entry.textMessage, !text.isEmpty { return String(localized: "Text") }
         guard let first = entry.fileNames.first else { return entry.direction.title }
         return entry.fileNames.count == 1 ? first : "\(first) +\(entry.fileNames.count - 1)"
     }
@@ -526,20 +526,20 @@ struct SendView: View {
     private func sendStatusText(_ progress: LocalSendTransferProgress) -> String {
         switch progress.status {
         case "waiting":
-            return "Waiting for approval"
+            return progress.localizedStatus
         case "sending":
-            return "Sending files"
+            return progress.localizedStatus
         case "finished":
-            return "Transfer complete"
+            return progress.localizedStatus
         case "failed":
             if progress.error?.localizedCaseInsensitiveContains("accept") == true {
-                return "Rejected"
+                return String(localized: "Rejected")
             }
-            return "Transfer failed"
+            return progress.localizedStatus
         case "canceled":
-            return "Canceled"
+            return progress.localizedStatus
         default:
-            return progress.status.capitalized
+            return progress.localizedStatus
         }
     }
 
@@ -562,20 +562,7 @@ struct SendView: View {
     }
 
     private func receiveStatusText(_ progress: LocalSendTransferProgress) -> String {
-        switch progress.status {
-        case "waiting":
-            return "Waiting for approval"
-        case "approved":
-            return "Accepted; waiting for upload"
-        case "receiving":
-            return "Receiving files"
-        case "finished":
-            return "Transfer complete"
-        case "failed":
-            return "Transfer failed"
-        default:
-            return progress.status.capitalized
-        }
+        progress.localizedStatus
     }
 
     private func receiveStatusIcon(_ progress: LocalSendTransferProgress) -> String {
@@ -597,9 +584,10 @@ struct SendView: View {
 
     private func transferDetailText(_ progress: LocalSendTransferProgress) -> String {
         if let text = progress.textMessage, !text.isEmpty {
-            return "Text"
+            return String(localized: "Text")
         }
-        return progress.currentFile ?? "\(progress.completedFiles) of \(progress.totalFiles) item(s)"
+        return progress.currentFile
+            ?? String(localized: "\(progress.completedFiles) of \(progress.totalFiles) items")
     }
 
 }
@@ -617,8 +605,8 @@ private struct TransferRow: View {
 
         var label: String {
             switch self {
-            case .send: "Sending"
-            case .receive: "Receiving"
+            case .send: String(localized: "Sending")
+            case .receive: String(localized: "Receiving")
             }
         }
     }

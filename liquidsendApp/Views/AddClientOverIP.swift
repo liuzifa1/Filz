@@ -55,11 +55,11 @@ struct AddClientOverIP: View {
     private func addDestination() {
         let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedAddress.isEmpty else {
-            validationError = "Enter an IP address or hostname."
+            validationError = String(localized: "Enter an IP address or hostname.")
             return
         }
         guard let targetPort = UInt16(port), targetPort > 0 else {
-            validationError = "Enter a valid port between 1 and 65535."
+            validationError = String(localized: "Enter a valid port between 1 and 65535.")
             return
         }
 

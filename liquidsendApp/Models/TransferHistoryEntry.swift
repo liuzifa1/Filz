@@ -9,8 +9,8 @@ enum TransferDirection: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .sent: "Sent"
-        case .received: "Received"
+        case .sent: String(localized: "Sent")
+        case .received: String(localized: "Received")
         }
     }
 
@@ -27,6 +27,13 @@ enum TransferResult: String, Codable, CaseIterable, Identifiable {
     case failed
 
     var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .completed: String(localized: "Completed")
+        case .failed: String(localized: "Failed")
+        }
+    }
 }
 
 struct TransferHistoryDraft: Equatable {

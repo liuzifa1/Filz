@@ -74,7 +74,7 @@ struct TransferProgressDetailView: View {
         List {
             Section("Transfer") {
                 LabeledContent("Direction", value: direction.title)
-                LabeledContent("Status", value: progress.status.capitalized)
+                LabeledContent("Status", value: progress.localizedStatus)
                 LabeledContent("Device", value: peerName)
                 if let address {
                     LabeledContent("Address", value: address)
@@ -96,7 +96,12 @@ struct TransferProgressDetailView: View {
                 LabeledContent("Progress", value: progress.percentText)
                 LabeledContent("Transferred", value: ByteCountFormatter.string(fromByteCount: Int64(clamping: progress.transferredBytes), countStyle: .file))
                 LabeledContent("Total", value: ByteCountFormatter.string(fromByteCount: Int64(clamping: progress.totalBytes), countStyle: .file))
-                LabeledContent("Files", value: progress.isTextMessage ? "Text" : "\(progress.completedFiles) of \(progress.totalFiles)")
+                LabeledContent(
+                    "Files",
+                    value: progress.isTextMessage
+                        ? String(localized: "Text")
+                        : String(localized: "\(progress.completedFiles) of \(progress.totalFiles) items")
+                )
                 if let speed = progress.bytesPerSecond {
                     LabeledContent(progress.status == "finished" ? "Average Speed" : "Speed", value: speedText(speed))
                 }
@@ -148,8 +153,8 @@ struct TransferProgressDetailView: View {
 
     private var peerName: String {
         switch direction {
-        case .sent: progress.targetAlias ?? "LocalSend device"
-        case .received: progress.senderAlias ?? "LocalSend device"
+        case .sent: progress.targetAlias ?? String(localized: "LocalSend device")
+        case .received: progress.senderAlias ?? String(localized: "LocalSend device")
         }
     }
 
@@ -180,8 +185,8 @@ struct TransferProgressDetailView: View {
 
     private func durationText(_ interval: TimeInterval) -> String {
         let seconds = max(Int(interval.rounded()), 0)
-        if seconds < 60 { return "\(seconds)s" }
-        return "\(seconds / 60)m \(seconds % 60)s"
+        if seconds < 60 { return String(localized: "\(seconds) seconds") }
+        return String(localized: "\(seconds / 60) minutes \(seconds % 60) seconds")
     }
 }
 

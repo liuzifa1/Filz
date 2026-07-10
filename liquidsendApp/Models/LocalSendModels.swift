@@ -207,4 +207,18 @@ struct LocalSendTransferProgress: Decodable, Equatable {
         }
         return Double(totalBytes - transferredBytes) / bytesPerSecond
     }
+
+    var localizedStatus: String {
+        switch status {
+        case "waiting": String(localized: "Waiting for approval")
+        case "approved": String(localized: "Accepted; waiting for upload")
+        case "sending": String(localized: "Sending files")
+        case "receiving": String(localized: "Receiving files")
+        case "finished": String(localized: "Transfer complete")
+        case "failed": String(localized: "Transfer failed")
+        case "declined": String(localized: "Declined")
+        case "canceled": String(localized: "Canceled")
+        default: status
+        }
+    }
 }
