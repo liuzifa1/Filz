@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 // Observe core status
 @Observable
 final class CoreStatus {
+    let sessionStartedAt = Date()
     var isCoreAvailable: Bool = LocalSendCoreClient.isAvailable
     var isCoreRunning: Bool = LocalSendCoreClient.isServerRunning
     var coreVersion: String = LocalSendCoreClient.version

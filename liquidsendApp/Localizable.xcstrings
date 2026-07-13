@@ -324,18 +324,18 @@
         }
       }
     },
-    "Add photos, files, or text to continue.": {
+    "Add photos, videos, files, or text to continue.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "続けるには写真、ファイル、またはテキストを追加してください。"
+            "value": "続けるには写真、ビデオ、ファイル、またはテキストを追加してください。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加照片、文件或文本以继续。"
+            "value": "添加照片、视频、文件或文本以继续。"
           }
         }
       }
@@ -916,18 +916,18 @@
         }
       }
     },
-    "Could not prepare photos: %@": {
+    "Could not prepare media: %@": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "写真を準備できませんでした：%@"
+            "value": "メディアを準備できませんでした：%@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法准备照片：%@"
+            "value": "无法准备媒体：%@"
           }
         }
       }
@@ -2260,18 +2260,18 @@
         }
       }
     },
-    "Photos": {
+    "Photos & Videos": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "写真"
+            "value": "写真とビデオ"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "照片"
+            "value": "照片和视频"
           }
         }
       }
@@ -3286,18 +3286,18 @@
         }
       }
     },
-    "The selected photos could not be loaded.": {
+    "The selected media could not be loaded.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "選択した写真を読み込めませんでした。"
+            "value": "選択したメディアを読み込めませんでした。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法载入所选照片。"
+            "value": "无法载入所选媒体。"
           }
         }
       }

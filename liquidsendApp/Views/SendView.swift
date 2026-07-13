@@ -376,10 +376,8 @@ struct SendView: View {
     }
 
     // Active transfers come live from the core (keeping their accept/cancel
-    // controls); any remaining slots — up to 2 rows total — are filled with the
-    // most recent History entries the user hasn't hidden. Only the 2 newest
-    // entries are ever eligible, so hiding the visible rows empties the section
-    // instead of pulling older history up one at a time.
+    // controls); any remaining slots are filled with transfers completed during
+    // this app session. Older records remain available in the History tab.
     private var transferItems: [TransferItem] {
         var items: [TransferItem] = []
         if let request = coreStatus.pendingReceiveRequest {
@@ -394,6 +392,7 @@ struct SendView: View {
         }
         if items.count < 2 {
             let recent = historyEntries
+                .filter { $0.timestamp >= coreStatus.sessionStartedAt }
                 .prefix(2)
                 .filter { !$0.hiddenFromRecents }
                 .prefix(2 - items.count)

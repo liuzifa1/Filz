@@ -168,7 +168,7 @@ struct SettingsFormView: View {
                 HStack {
                     Text("App")
                     Spacer()
-                    Text("0.2.4")
+                    Text("0.2.8")
                         .foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())

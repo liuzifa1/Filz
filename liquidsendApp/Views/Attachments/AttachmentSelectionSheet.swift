@@ -1,3 +1,4 @@
+import CoreTransferable
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -17,7 +18,7 @@ struct AttachmentSelectionSheet: View {
     @State private var showTextComposer = false
     @State private var showDestinationPicker = false
     @State private var showManualDestination = false
-    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var selectedMedia: [PhotosPickerItem] = []
     @State private var isImporting = false
     @State private var didPresentInitialPanel = false
 
@@ -87,13 +88,14 @@ struct AttachmentSelectionSheet: View {
             }
             .photosPicker(
                 isPresented: $showPhotoPicker,
-                selection: $selectedPhotos,
+                selection: $selectedMedia,
                 maxSelectionCount: 20,
-                matching: .images
+                matching: .any(of: [.images, .videos]),
+                preferredItemEncoding: .current
             )
-            .onChange(of: selectedPhotos) { _, photos in
-                guard !photos.isEmpty else { return }
-                Task { await importPhotos(photos) }
+            .onChange(of: selectedMedia) { _, media in
+                guard !media.isEmpty else { return }
+                Task { await importMedia(media) }
             }
             .sheet(isPresented: $showTextComposer) {
                 TextTransferComposer { url, preview in
@@ -150,7 +152,7 @@ struct AttachmentSelectionSheet: View {
     private var attachmentSection: some View {
         Section("Attachments") {
             Button { showPhotoPicker = true } label: {
-                Label("Photos", systemImage: "photo.on.rectangle.angled")
+                Label("Photos & Videos", systemImage: "photo.on.rectangle.angled")
             }
             Button { showFileImporter = true } label: {
                 Label("Files", systemImage: "folder")
@@ -163,7 +165,7 @@ struct AttachmentSelectionSheet: View {
                 ContentUnavailableView(
                     "No Attachments",
                     systemImage: "paperclip",
-                    description: Text("Add photos, files, or text to continue.")
+                    description: Text("Add photos, videos, files, or text to continue.")
                 )
             } else {
                 ForEach(coreStatus.selectedFileURLs, id: \.self) { url in
@@ -249,30 +251,25 @@ struct AttachmentSelectionSheet: View {
         dismiss()
     }
 
-    private func importPhotos(_ photos: [PhotosPickerItem]) async {
+    private func importMedia(_ media: [PhotosPickerItem]) async {
         isImporting = true
         defer {
-            selectedPhotos = []
+            selectedMedia = []
             isImporting = false
         }
-        let directory = FileManager.default.temporaryDirectory.appending(path: "LiquidSend Photos", directoryHint: .isDirectory)
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             var urls: [URL] = []
-            for photo in photos {
-                guard let data = try await photo.loadTransferable(type: Data.self) else { continue }
-                let type = photo.supportedContentTypes.first ?? .jpeg
-                let url = directory.appending(path: "Photo-\(UUID().uuidString).\(type.preferredFilenameExtension ?? "jpg")")
-                try data.write(to: url, options: .atomic)
-                urls.append(url)
+            for item in media {
+                guard let file = try await item.loadTransferable(type: PickedMediaFile.self) else { continue }
+                urls.append(file.url)
             }
             if urls.isEmpty {
-                coreStatus.transferError = String(localized: "The selected photos could not be loaded.")
+                coreStatus.transferError = String(localized: "The selected media could not be loaded.")
             } else {
                 coreStatus.addFiles(urls)
             }
         } catch {
-            coreStatus.transferError = String(localized: "Could not prepare photos: \(error.localizedDescription)")
+            coreStatus.transferError = String(localized: "Could not prepare media: \(error.localizedDescription)")
         }
     }
 
@@ -282,6 +279,40 @@ struct AttachmentSelectionSheet: View {
         if type.conforms(to: .text) { return "doc.text.fill" }
         if type.conforms(to: .movie) { return "video.fill" }
         return "doc.fill"
+    }
+}
+
+private struct PickedMediaFile: Transferable, Sendable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .image) { received in
+            try stage(received)
+        }
+        FileRepresentation(importedContentType: .movie) { received in
+            try stage(received)
+        }
+    }
+
+    private static func stage(_ received: ReceivedTransferredFile) throws -> PickedMediaFile {
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appending(
+            path: "Filz Media",
+            directoryHint: .isDirectory
+        )
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let sourceName = received.file.lastPathComponent.isEmpty
+            ? "Media"
+            : received.file.lastPathComponent
+        let destination = directory.appending(path: "\(UUID().uuidString)-\(sourceName)")
+
+        if !received.isOriginalFile,
+           (try? manager.moveItem(at: received.file, to: destination)) != nil {
+            return PickedMediaFile(url: destination)
+        }
+        try manager.copyItem(at: received.file, to: destination)
+        return PickedMediaFile(url: destination)
     }
 }
 

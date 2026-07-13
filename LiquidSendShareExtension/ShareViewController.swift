@@ -198,20 +198,38 @@ final class ShareViewController: UIViewController {
             return writeText(text, to: directory)
         }
 
+        if let identifier = bestFileTypeIdentifier(for: provider),
+           let item = await loadFileRepresentation(provider, identifier: identifier, to: directory) {
+            return item
+        }
+
         if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier),
            let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil),
            let url = (item as? URL) ?? (item as? NSURL).map({ $0 as URL }) {
-            return importFile(at: url, to: directory)
+            return importFile(at: url, to: directory, canMove: false)
         }
 
-        guard let identifier = bestFileTypeIdentifier(for: provider) else {
-            return nil
-        }
+        return nil
+    }
+
+    nonisolated private static func loadFileRepresentation(
+        _ provider: NSItemProvider,
+        identifier: String,
+        to directory: URL
+    ) async -> SharedManifestItem? {
         return await withCheckedContinuation { (continuation: CheckedContinuation<SharedManifestItem?, Never>) in
-            provider.loadInPlaceFileRepresentation(forTypeIdentifier: identifier) { url, _, _ in
-                // The system deletes its temp copy when this handler returns,
-                // so the file must be claimed synchronously here.
-                continuation.resume(returning: url.flatMap { importFile(at: $0, to: directory) })
+            provider.loadInPlaceFileRepresentation(forTypeIdentifier: identifier) { url, isInPlace, _ in
+                guard let url else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                if isInPlace, let item = bookmarkFile(at: url) {
+                    continuation.resume(returning: item)
+                } else {
+                    // Provider-owned temporary files disappear after this
+                    // callback, so claim them before returning.
+                    continuation.resume(returning: importFile(at: url, to: directory, canMove: !isInPlace))
+                }
             }
         }
     }
@@ -219,6 +237,8 @@ final class ShareViewController: UIViewController {
     nonisolated private static func inlineText(from provider: NSItemProvider) async -> String? {
         let isFileBacked = provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
             || provider.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+            || provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+            || provider.hasItemConformingToTypeIdentifier(UTType.audio.identifier)
         guard !isFileBacked else { return nil }
 
         if provider.hasItemConformingToTypeIdentifier(UTType.text.identifier) {
@@ -248,7 +268,9 @@ final class ShareViewController: UIViewController {
     // instead of transcoding to whatever representation happens to be listed
     // first. Registered order is kept within each category.
     nonisolated private static func bestFileTypeIdentifier(for provider: NSItemProvider) -> String? {
-        let identifiers = provider.registeredTypeIdentifiers
+        let identifiers = provider.registeredTypeIdentifiers.filter {
+            $0 != UTType.fileURL.identifier && $0 != UTType.url.identifier
+        }
         let preferences: [UTType] = [.movie, .image, .audio, .pdf, .data]
         for preference in preferences {
             if let match = identifiers.first(where: { UTType($0)?.conforms(to: preference) == true }) {
@@ -258,7 +280,25 @@ final class ShareViewController: UIViewController {
         return identifiers.first
     }
 
-    nonisolated private static func importFile(at source: URL, to directory: URL) -> SharedManifestItem? {
+    nonisolated private static func bookmarkFile(at source: URL) -> SharedManifestItem? {
+        let didAccess = source.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                source.stopAccessingSecurityScopedResource()
+            }
+        }
+        guard let bookmarkData = try? source.bookmarkData() else { return nil }
+        let sourceName = source.lastPathComponent.isEmpty
+            ? String(localized: "Shared Item")
+            : source.lastPathComponent
+        return SharedManifestItem(fileName: sourceName, textPreview: nil, bookmarkData: bookmarkData)
+    }
+
+    nonisolated private static func importFile(
+        at source: URL,
+        to directory: URL,
+        canMove: Bool
+    ) -> SharedManifestItem? {
         let sourceName = source.lastPathComponent.isEmpty
             ? String(localized: "Shared Item")
             : source.lastPathComponent
@@ -271,9 +311,9 @@ final class ShareViewController: UIViewController {
             }
         }
         let manager = FileManager.default
-        // A hardlink is instant and always works for the system's temp copies,
-        // which live in this extension's own sandbox. copyItem clones on APFS
-        // when it can, so the fallback is usually cheap as well.
+        if canMove, (try? manager.moveItem(at: source, to: destination)) != nil {
+            return SharedManifestItem(fileName: destinationName, textPreview: nil, bookmarkData: nil)
+        }
         if (try? manager.linkItem(at: source, to: destination)) == nil {
             do {
                 try manager.copyItem(at: source, to: destination)
