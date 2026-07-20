@@ -34,6 +34,10 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Filz! uses your local network to discover nearby devices and transfer files.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_filz-permission._tcp</string>
+	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Filz! can save received photos and videos to your photo library when Save media to gallery is enabled.</string>
 	<key>NSSupportsLiveActivities</key>

@@ -8,24 +8,58 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+private enum SettingsRoute: Hashable {
+    case localSendPlatformGuide
+}
+
 // Main body for Settings view
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settingsList: [SettingsModel]
     @Environment(\.dismiss) private var dismiss
+    @State private var navigationPath: [SettingsRoute]
+    private let showPlatformGuideOnAppear: Bool
+
+    init(showPlatformGuideOnAppear: Bool = false) {
+        self.showPlatformGuideOnAppear = showPlatformGuideOnAppear
+        _navigationPath = State(
+            initialValue: showPlatformGuideOnAppear ? [.localSendPlatformGuide] : []
+        )
+    }
     
     // Main body here, form view has been split from this view to imporove readability
     var body: some View {
-        NavigationStack {
-            if let settings = settingsList.first {
-                SettingsFormView(settings: settings, dismiss: dismiss)
-            } else {
-                ProgressView()
-                    .onAppear {
-                        ensureSettingsModelExists()
-                    }
+        NavigationStack(path: $navigationPath) {
+            Group {
+                if let settings = settingsList.first {
+                    SettingsFormView(settings: settings, dismiss: dismiss)
+                } else {
+                    ProgressView()
+                        .onAppear {
+                            ensureSettingsModelExists()
+                        }
+                }
+            }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                switch route {
+                case .localSendPlatformGuide:
+                    LocalSendPlatformGuideView()
+                }
             }
         }
+        .onAppear {
+            openPlatformGuideIfRequested()
+        }
+        .onChange(of: showPlatformGuideOnAppear) { _, shouldOpen in
+            guard shouldOpen else { return }
+            openPlatformGuideIfRequested()
+        }
+    }
+
+    private func openPlatformGuideIfRequested() {
+        guard showPlatformGuideOnAppear,
+              navigationPath.last != .localSendPlatformGuide else { return }
+        navigationPath = [.localSendPlatformGuide]
     }
 
     private func ensureSettingsModelExists() {
@@ -43,7 +77,11 @@ struct SettingsView: View {
 struct SettingsFormView: View {
     @Environment(CoreStatus.self) private var coreStatus
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.filzDebugModeEnabled) private var debugModeEnabled
     @Query private var historyEntries: [TransferHistoryEntry]
+    @AppStorage(FilzDebugSettings.replayWelcomeIntroKey) private var replayWelcomeIntro = false
+    @AppStorage(FilzDebugSettings.alwaysShowWelcomeIntroKey) private var alwaysShowWelcomeIntro = false
+    @AppStorage(FilzDebugSettings.showNetworkDiagnosticsKey) private var showNetworkDiagnostics = false
     @State private var identityName = ""
     @State private var showIdentityEditor = false
     @State private var showHistoryDeleteConfirmation = false
@@ -182,12 +220,18 @@ struct SettingsFormView: View {
                 NavigationLink("About Filz!") {
                     AboutAppView()
                 }
+                NavigationLink("Use LocalSend on Other Platforms") {
+                    LocalSendPlatformGuideView()
+                }
                 NavigationLink("Privacy Policy") {
                     PrivacyPolicyView()
                 }
                 NavigationLink("Open Source Acknowledgements") {
                     OpenSourceAcknowledgementsView()
                 }
+            }
+            if debugModeEnabled {
+                debugSection
             }
         }
         .toolbar {
@@ -242,6 +286,37 @@ struct SettingsFormView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes all saved transfer records.")
+        }
+    }
+
+    private var debugSection: some View {
+        Section {
+            Toggle("Replay Welcome Intro", isOn: $replayWelcomeIntro)
+            Toggle("Always Show Welcome Intro on Launch", isOn: $alwaysShowWelcomeIntro)
+            Toggle("Show Network Diagnostics", isOn: $showNetworkDiagnostics)
+
+            if showNetworkDiagnostics {
+                LabeledContent(
+                    "Core State",
+                    value: coreStatus.isCoreRunning ? "Running" : "Stopped"
+                )
+                LabeledContent("Core Version", value: coreStatus.coreVersion)
+                LabeledContent(
+                    "Active Endpoint",
+                    value: coreStatus.activePort.map { "\(coreStatus.activeProtocol)://*:\($0)" }
+                        ?? "Unavailable"
+                )
+                LabeledContent(
+                    "Local IPv4",
+                    value: coreStatus.localIPv4Addresses.isEmpty
+                        ? "Unavailable"
+                        : coreStatus.localIPv4Addresses.joined(separator: ", ")
+                )
+            }
+        } header: {
+            Text("Debug")
+        } footer: {
+            Text("Replay Welcome Intro starts after Settings closes. Debug options are available only when debug mode is enabled in the app entry point.")
         }
     }
 

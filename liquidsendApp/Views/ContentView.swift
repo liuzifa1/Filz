@@ -13,22 +13,34 @@ private enum MainTab: Hashable {
    case history
 }
 
+private enum SettingsPresentation: String, Identifiable {
+   case root
+   case localSendPlatformGuide
+
+   var id: String { rawValue }
+}
+
 // MARK: - The main content here
 struct ContentView: View {
    // MARK: variables
    @Environment(\.modelContext) private var modelContext
    @Environment(\.scenePhase) private var scenePhase
    @Environment(CoreStatus.self) private var coreStatus
+   @Environment(\.filzDebugModeEnabled) private var debugModeEnabled
    @Query private var settings: [SettingsModel] // Fetch settings model from swiftdata
    
-   @State private var showSettingsPage = false // Used for opening settings view
+   @State private var settingsPresentation: SettingsPresentation?
    @State private var showAttachmentPanel = false
    @State private var showDestinationPickerOnOpen = false
    @State private var showManualDestinationOnOpen = false
    @State private var attachmentAllowsMultipleDestinations = false
    @State private var selectedTab: MainTab = .send
    @State private var showReceiveDetails = false
-   @State private var showPhotoLibraryPermissionPrompt = false
+   @State private var showInitialSetup = false
+   @State private var showPlatformGuideAfterSetup = false
+   @AppStorage(InitialSetupState.completionKey) private var didCompleteInitialSetup = false
+   @AppStorage(FilzDebugSettings.replayWelcomeIntroKey) private var replayWelcomeIntro = false
+   @AppStorage(FilzDebugSettings.alwaysShowWelcomeIntroKey) private var alwaysShowWelcomeIntro = false
    
    private var setting: SettingsModel {
            if let existing = settings.first {
@@ -89,15 +101,11 @@ struct ContentView: View {
                       // Settings button
                       ToolbarItem(placement: .topBarTrailing) {
                           Button {
-                              showSettingsPage = true
+                              settingsPresentation = .root
                           } label: {
                               Image(systemName: "gear")
                           }
                       }
-                  }
-                  // Sheet out settings page
-                  .sheet(isPresented: $showSettingsPage) {
-                     SettingsView()
                   }
                   .sheet(isPresented: $showAttachmentPanel, onDismiss: resetAttachmentPresentation) {
                      AttachmentSelectionSheet(
@@ -128,38 +136,35 @@ struct ContentView: View {
             }
          }
       }
-      .alert("Auto Add to Photos", isPresented: $showPhotoLibraryPermissionPrompt) {
-         Button("Not Now", role: .cancel) {
-            MediaLibrarySaver.markFirstRunPhotoLibraryPromptHandled()
-         }
-         Button("Allow Access") {
-            requestPhotoLibraryPermissionForAutoAdd()
-         }
-      } message: {
-         Text("Filz can automatically add received photos and videos to your Photos library.")
+      .sheet(item: $settingsPresentation, onDismiss: handleSettingsDismissal) { presentation in
+         SettingsView(
+            showPlatformGuideOnAppear: presentation == .localSendPlatformGuide
+         )
+         .id(presentation.id)
+      }
+      .sheet(isPresented: $showInitialSetup, onDismiss: presentPlatformGuideAfterSetupIfNeeded) {
+         InitialSetupView(
+            settings: setting,
+            finishSetup: completeInitialSetup,
+            openPlatformGuide: {
+               showPlatformGuideAfterSetup = true
+               completeInitialSetup()
+            }
+         )
       }
       .onChange(of: scenePhase) { _, phase in
          guard phase == .active else { return }
          Task { await importSharedAttachments() }
       }
       .task {
+         configureInitialSetupPresentation()
          await importSharedAttachments()
          if setting.userName == "Sponge Bob" {
             setting.userName = SettingsModel.defaultDeviceName()
             try? modelContext.save()
          }
          migrateEncryptionDefaultIfNeeded()
-         presentPhotoLibraryPermissionPromptIfNeeded()
-         if !coreStatus.isCoreRunning {
-            coreStatus.start(
-               alias: setting.userName,
-               portText: setting.port,
-               deviceModel: setting.deviceModel,
-               deviceIcon: setting.selectedDeviceIcon,
-               useEncryption: setting.usesEncryption,
-               receivePIN: setting.requirePIN ? setting.receivePIN : nil
-            )
-         }
+         startCoreIfNeeded()
          while !Task.isCancelled {
             if setting.userName == "Sponge Bob" {
                setting.userName = SettingsModel.defaultDeviceName()
@@ -191,18 +196,60 @@ struct ContentView: View {
       }
    }
 
-   private func presentPhotoLibraryPermissionPromptIfNeeded() {
-      guard MediaLibrarySaver.shouldPromptForPhotoLibraryPermissionOnFirstRun() else { return }
-      showPhotoLibraryPermissionPrompt = true
+   private func completeInitialSetup() {
+      didCompleteInitialSetup = true
+      showInitialSetup = false
+      startCoreIfNeeded()
    }
 
-   private func requestPhotoLibraryPermissionForAutoAdd() {
-      Task {
-         let allowed = await MediaLibrarySaver.requestPhotoLibraryAddPermission(markFirstRunPromptHandled: true)
-         guard allowed else { return }
-         setting.saveMediaToGallery = true
-         try? modelContext.save()
+   private func presentPlatformGuideAfterSetupIfNeeded() {
+      guard showPlatformGuideAfterSetup else { return }
+      showPlatformGuideAfterSetup = false
+      settingsPresentation = .localSendPlatformGuide
+   }
+
+   private func handleSettingsDismissal() {
+      guard debugModeEnabled, replayWelcomeIntro else { return }
+      beginDebugWelcomeReplay()
+   }
+
+   private func beginDebugWelcomeReplay() {
+      replayWelcomeIntro = false
+      didCompleteInitialSetup = false
+      UserDefaults.standard.set(true, forKey: InitialSetupState.startedKey)
+      showInitialSetup = true
+   }
+
+   private func configureInitialSetupPresentation() {
+      if debugModeEnabled, replayWelcomeIntro || alwaysShowWelcomeIntro {
+         beginDebugWelcomeReplay()
+         return
       }
+
+      let defaults = UserDefaults.standard
+      if defaults.object(forKey: InitialSetupState.completionKey) == nil,
+         !defaults.bool(forKey: InitialSetupState.startedKey) {
+         if defaults.object(forKey: InitialSetupState.existingInstallationKey) != nil {
+            didCompleteInitialSetup = true
+         } else {
+            // Keep an interrupted first-run setup resumable even after the
+            // legacy migration key is written later in this launch.
+            defaults.set(true, forKey: InitialSetupState.startedKey)
+         }
+      }
+      showInitialSetup = !didCompleteInitialSetup
+   }
+
+   private func startCoreIfNeeded() {
+      guard didCompleteInitialSetup, !coreStatus.isCoreRunning else { return }
+      coreStatus.start(
+         alias: setting.userName,
+         portText: setting.port,
+         deviceModel: setting.deviceModel,
+         deviceIcon: setting.selectedDeviceIcon,
+         useEncryption: setting.usesEncryption,
+         receivePIN: setting.requirePIN ? setting.receivePIN : nil
+      )
    }
 
    private func migrateEncryptionDefaultIfNeeded() {

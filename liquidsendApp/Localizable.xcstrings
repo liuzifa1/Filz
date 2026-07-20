@@ -116,6 +116,16 @@
         }
       }
     },
+    "%lld/%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
     "© 2026 Zifa Liu. All rights reserved.": {
       "localizations": {
         "ja": {
@@ -133,6 +143,7 @@
       }
     },
     "0.2.4": {
+      "extractionState": "stale",
       "localizations": {
         "ja": {
           "stringUnit": {
@@ -148,6 +159,7 @@
         }
       }
     },
+    "0.2.8": {},
     "About": {
       "localizations": {
         "ja": {
@@ -196,6 +208,23 @@
         }
       }
     },
+    "Accept the transfer on the receiving device.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受信側のデバイスで転送を承認します。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在接收设备上接受传输。"
+          }
+        }
+      }
+    },
+    "Accepted": {},
     "Accepted; waiting for upload": {
       "localizations": {
         "ja": {
@@ -212,6 +241,7 @@
         }
       }
     },
+    "Active Endpoint": {},
     "Active Transfers": {
       "localizations": {
         "ja": {
@@ -389,6 +419,7 @@
       }
     },
     "Allow Access": {
+      "extractionState": "stale",
       "localizations": {
         "ja": {
           "stringUnit": {
@@ -400,6 +431,151 @@
           "stringUnit": {
             "state": "translated",
             "value": "允许访问"
+          }
+        }
+      }
+    },
+    "Allow add-only Photos access if you want Filz to save received photos and videos to your library. Filz can add new items but can’t read your existing library.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受信した写真やビデオをライブラリに保存するには、写真への追加のみのアクセスを許可してください。Filzは新しい項目を追加できますが、既存のライブラリを読み取ることはできません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果你希望 Filz 将收到的照片和视频保存到照片图库，请允许“仅添加照片”访问权限。Filz 可以添加新项目，但无法读取你现有的图库。"
+          }
+        }
+      }
+    },
+    "Allow Local Network Access": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルネットワークへのアクセスを許可"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许访问本地网络"
+          }
+        }
+      }
+    },
+    "Allow Photos Access": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真へのアクセスを許可"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许访问照片"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "続ける"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "Finish Setup": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を完了"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成设置"
+          }
+        }
+      }
+    },
+    "Requesting Access…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセスをリクエスト中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在请求访问权限…"
+          }
+        }
+      }
+    },
+    "Skip for Now": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今はスキップ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂时跳过"
+          }
+        }
+      }
+    },
+    "Always Show Welcome Intro on Launch": {},
+    "Android": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Android"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Android"
+          }
+        }
+      }
+    },
+    "Android 5.0 or later": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Android 5.0以降"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Android 5.0 或更高版本"
           }
         }
       }
@@ -517,6 +693,7 @@
       }
     },
     "Auto Add to Photos": {
+      "extractionState": "stale",
       "localizations": {
         "ja": {
           "stringUnit": {
@@ -672,6 +849,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "请确认两台设备连接到同一网络。"
+          }
+        }
+      }
+    },
+    "Choose a Website Download": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Webサイトからダウンロードを選ぶ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择网站下载"
           }
         }
       }
@@ -916,6 +1109,8 @@
         }
       }
     },
+    "Core State": {},
+    "Core Version": {},
     "Could not prepare media: %@": {
       "localizations": {
         "ja": {
@@ -980,6 +1175,7 @@
         }
       }
     },
+    "Debug": {},
     "Decline": {
       "localizations": {
         "ja": {
@@ -1252,6 +1448,22 @@
         }
       }
     },
+    "Download from the LocalSend Website": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LocalSendのWebサイトからダウンロード"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 LocalSend 网站下载"
+          }
+        }
+      }
+    },
     "Encryption": {
       "localizations": {
         "ja": {
@@ -1493,6 +1705,7 @@
       }
     },
     "Filz can automatically add received photos and videos to your Photos library.": {
+      "extractionState": "stale",
       "localizations": {
         "ja": {
           "stringUnit": {
@@ -1520,6 +1733,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filz 是一个开源项目，旨在 iOS 上提供原生的 LocalSend 体验。"
+          }
+        }
+      }
+    },
+    "Filz is ready to send files to and receive files from LocalSend on your other devices.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filzから他のデバイス上のLocalSendへファイルを送受信できるようになりました。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz 已准备好与其他设备上的 LocalSend 收发文件。"
+          }
+        }
+      }
+    },
+    "Filz needs Local Network access to discover LocalSend devices on your Wi-Fi and transfer files directly between them. Your files never leave your local network.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filzは、Wi-Fi上のLocalSendデバイスを検出し、デバイス間でファイルを直接転送するためにローカルネットワークへのアクセスが必要です。ファイルがローカルネットワークの外部に送信されることはありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz 需要“本地网络”访问权限，才能发现 Wi-Fi 网络中的 LocalSend 设备并在设备之间直接传输文件。你的文件不会离开本地网络。"
           }
         }
       }
@@ -1572,6 +1817,22 @@
         }
       }
     },
+    "Find Nearby Devices": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近くのデバイスを探す"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找附近的设备"
+          }
+        }
+      }
+    },
     "Fingerprint": {
       "localizations": {
         "ja": {
@@ -1584,6 +1845,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "指纹"
+          }
+        }
+      }
+    },
+    "Get It on Google Play": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google Playから入手"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前往 Google Play 获取"
           }
         }
       }
@@ -1700,6 +1977,54 @@
         }
       }
     },
+    "In Filz, add files and choose that nearby device.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filzでファイルを追加し、近くにあるそのデバイスを選びます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Filz 中添加文件，然后选择附近的那台设备。"
+          }
+        }
+      }
+    },
+    "Install LocalSend on another device, connect it to the same local network as Filz, and both devices will appear automatically.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別のデバイスにLocalSendをインストールし、Filzと同じローカルネットワークに接続すると、両方のデバイスが自動的に表示されます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在另一台设备上安装 LocalSend，将它与 Filz 连接到同一本地网络，两台设备就会自动显示。"
+          }
+        }
+      }
+    },
+    "Install with Flatpak": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flatpakでインストール"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Flatpak 安装"
+          }
+        }
+      }
+    },
     "IP address or hostname": {
       "localizations": {
         "ja": {
@@ -1718,16 +2043,16 @@
     },
     "IP unavailable": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法获取 IP 地址"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "IPアドレスを取得できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法获取 IP 地址"
           }
         }
       }
@@ -1796,6 +2121,22 @@
         }
       }
     },
+    "Let’s get Filz ready to send and receive files with nearby LocalSend devices.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近くのLocalSendデバイスとファイルを送受信できるように、Filzを設定しましょう。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让我们设置好 Filz，以便与附近的 LocalSend 设备收发文件。"
+          }
+        }
+      }
+    },
     "License": {
       "localizations": {
         "ja": {
@@ -1812,6 +2153,23 @@
         }
       }
     },
+    "Linux": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linux"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linux"
+          }
+        }
+      }
+    },
+    "Local IPv4": {},
     "Local Network access is used to discover and communicate with nearby LocalSend-compatible devices.": {
       "localizations": {
         "ja": {
@@ -2085,6 +2443,7 @@
       }
     },
     "Not Now": {
+      "extractionState": "stale",
       "localizations": {
         "ja": {
           "stringUnit": {
@@ -2144,6 +2503,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "在“文件”中打开"
+          }
+        }
+      }
+    },
+    "Open LocalSend on the other device.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一方のデバイスでLocalSendを開きます。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在另一台设备上打开 LocalSend。"
           }
         }
       }
@@ -2704,6 +3079,8 @@
         }
       }
     },
+    "Replay Welcome Intro": {},
+    "Replay Welcome Intro starts after Settings closes. Debug options are available only when debug mode is enabled in the app entry point.": {},
     "Require PIN": {
       "localizations": {
         "ja": {
@@ -2784,6 +3161,22 @@
         }
       }
     },
+    "Save Received Media": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受信したメディアを保存"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存接收的媒体"
+          }
+        }
+      }
+    },
     "Save to history": {
       "localizations": {
         "ja": {
@@ -2802,16 +3195,16 @@
     },
     "Saved Device": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已保存设备"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "保存済みデバイス"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存设备"
           }
         }
       }
@@ -2876,6 +3269,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "发送"
+          }
+        }
+      }
+    },
+    "Send a File": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルを送信"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送文件"
           }
         }
       }
@@ -3094,6 +3503,7 @@
         }
       }
     },
+    "Show Network Diagnostics": {},
     "Size": {
       "localizations": {
         "ja": {
@@ -3496,160 +3906,160 @@
     },
     "Unable to answer receive request": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法响应接收请求"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "受信リクエストに応答できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法响应接收请求"
           }
         }
       }
     },
     "Unable to configure HTTPS identity": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法配置 HTTPS 身份"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "HTTPS IDを設定できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法配置 HTTPS 身份"
           }
         }
       }
     },
     "Unable to configure receive directory": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法配置接收目录"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "受信フォルダを設定できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法配置接收目录"
           }
         }
       }
     },
     "Unable to configure receive PIN": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法配置接收 PIN"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "受信PINを設定できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法配置接收 PIN"
           }
         }
       }
     },
     "Unable to create the TLS identity directory: %@": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法创建 TLS 身份目录：%@"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "TLS IDフォルダを作成できません：%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法创建 TLS 身份目录：%@"
           }
         }
       }
     },
     "Unable to encode selected files": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法编码所选文件"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "選択したファイルをエンコードできません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法编码所选文件"
           }
         }
       }
     },
     "Unable to send file": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法发送文件"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "ファイルを送信できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法发送文件"
           }
         }
       }
     },
     "Unable to send files": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法发送文件"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "ファイルを送信できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法发送文件"
           }
         }
       }
     },
     "Unable to start LocalSend Core": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法启动 LocalSend Core"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "LocalSend Coreを開始できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法启动 LocalSend Core"
           }
         }
       }
     },
     "Unavailable": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "不可用"
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "translated",
             "value": "利用できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
           }
         }
       }
@@ -3682,6 +4092,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "上游项目"
+          }
+        }
+      }
+    },
+    "Use LocalSend on Other Platforms": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "他のプラットフォームでLocalSendを使う"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在其他平台上使用 LocalSend"
           }
         }
       }
@@ -3750,6 +4176,7 @@
         }
       }
     },
+    "Waiting for sender...": {},
     "Waiting for upload": {
       "localizations": {
         "ja": {
@@ -3762,6 +4189,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待上传"
+          }
+        }
+      }
+    },
+    "Welcome to Filz!": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz!へようこそ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欢迎使用 Filz!"
+          }
+        }
+      }
+    },
+    "Windows": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows"
+          }
+        }
+      }
+    },
+    "Windows 10 or later": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows 10以降"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows 10 或更高版本"
           }
         }
       }
@@ -3782,8 +4257,214 @@
         }
       }
     },
-    "Accepted": {},
-    "Waiting for sender...": {}
+    "Check Again": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一度確認"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再次检查"
+          }
+        }
+      }
+    },
+    "Checking Access…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセスを確認中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查权限…"
+          }
+        }
+      }
+    },
+    "Filz couldn’t confirm Local Network access. Check that your device is connected to a network, then try again.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filzはローカルネットワークへのアクセスを確認できませんでした。デバイスがネットワークに接続されていることを確認してから、もう一度お試しください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filz 无法确认本地网络访问权限。请检查设备是否已连接到网络，然后重试。"
+          }
+        }
+      }
+    },
+    "Local Network Access Is Off": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルネットワークアクセスがオフです"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地网络访问已关闭"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を開く"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
+          }
+        }
+      }
+    },
+    "Without Local Network access, Filz can’t discover nearby LocalSend devices, send files, or receive files. Turn it on in Settings to continue setup.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルネットワークへのアクセスがないと、Filzは近くのLocalSendデバイスを検出したり、ファイルを送受信したりできません。設定でアクセスをオンにして、セットアップを続けてください。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果没有本地网络访问权限，Filz 将无法发现附近的 LocalSend 设备，也无法发送或接收文件。请在“设置”中开启权限以继续设置。"
+          }
+        }
+      }
+    },
+    "Install with Chocolatey": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chocolateyでインストール"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Chocolatey 安装"
+          }
+        }
+      }
+    },
+    "Install with Homebrew": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrewでインストール"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Homebrew 安装"
+          }
+        }
+      }
+    },
+    "Install with Snap": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Snapでインストール"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Snap 安装"
+          }
+        }
+      }
+    },
+    "Install with WinGet": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WinGetでインストール"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 WinGet 安装"
+          }
+        }
+      }
+    },
+    "macOS": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS"
+          }
+        }
+      }
+    },
+    "macOS 11 Big Sur or later": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 11 Big Sur以降"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 11 Big Sur 或更高版本"
+          }
+        }
+      }
+    },
+    "You’re All Set": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "準備が整いました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切就绪"
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }
