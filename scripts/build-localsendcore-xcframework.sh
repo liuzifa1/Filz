@@ -11,7 +11,7 @@ SIM_LIB="$BUILD_DIR/ios-simulator/liblocalsendcore.a"
 if xcode-select -p | grep -q "CommandLineTools" && [ -d /Applications/Xcode-beta.app ]; then
     export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
 fi
-export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-26.1}"
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"
 
 mkdir -p "$OUT_DIR"
 

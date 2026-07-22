@@ -44,6 +44,7 @@ struct InitialSetupView: View {
 
     @State private var page = Page.welcome
     @State private var isRequestingPhotoAccess = false
+    @State private var symbolAnimationTrigger = 0
     @State private var localNetworkAccessState = LocalNetworkAccessState.idle
     @State private var recheckLocalNetworkAccessWhenActive = false
     @State private var localNetworkPermissionProbe = LocalNetworkPermissionProbe()
@@ -102,7 +103,12 @@ struct InitialSetupView: View {
             message: "Let’s get Filz ready to send and receive files with nearby LocalSend devices."
         ) {
             Image(systemName: "paperplane.circle")
-                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating)
+                .symbolEffect(
+                    .bounce.up.byLayer,
+                    options: .nonRepeating,
+                    value: symbolAnimationTrigger
+                )
+                .onAppear(perform: playSymbolAnimation)
         }
     }
 
@@ -115,10 +121,20 @@ struct InitialSetupView: View {
         ) {
             if localNetworkAccessState == .denied {
                 Image(systemName: "exclamationmark.triangle")
-                    .symbolEffect(.bounce, options: .nonRepeating)
+                    .symbolEffect(
+                        .bounce,
+                        options: .nonRepeating,
+                        value: symbolAnimationTrigger
+                    )
+                    .onAppear(perform: playSymbolAnimation)
             } else {
                 Image(systemName: "dot.radiowaves.left.and.right")
-                    .symbolEffect(.bounce, options: .nonRepeating)
+                    .symbolEffect(
+                        .bounce,
+                        options: .nonRepeating,
+                        value: symbolAnimationTrigger
+                    )
+                    .onAppear(perform: playSymbolAnimation)
             }
         }
     }
@@ -140,7 +156,12 @@ struct InitialSetupView: View {
             message: "Allow add-only Photos access if you want Filz to save received photos and videos to your library. Filz can add new items but can’t read your existing library."
         ) {
             Image(systemName: "photo.on.rectangle.angled")
-                .symbolEffect(.bounce, options: .nonRepeating)
+                .symbolEffect(
+                    .bounce,
+                    options: .nonRepeating,
+                    value: symbolAnimationTrigger
+                )
+                .onAppear(perform: playSymbolAnimation)
         }
     }
 
@@ -150,7 +171,12 @@ struct InitialSetupView: View {
             message: "Filz is ready to send files to and receive files from LocalSend on your other devices."
         ) {
             Image(systemName: "checkmark.circle")
-                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating)
+                .symbolEffect(
+                    .bounce.up.byLayer,
+                    options: .nonRepeating,
+                    value: symbolAnimationTrigger
+                )
+                .onAppear(perform: playSymbolAnimation)
         }
     }
 
@@ -222,9 +248,9 @@ struct InitialSetupView: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 30)
         }
-        .buttonStyle(.glassProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.large)
+        .modifier(SetupPrimaryButtonStyle())
     }
 
     private func secondaryButton(
@@ -237,10 +263,14 @@ struct InitialSetupView: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 30)
         }
-        .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
         .controlSize(.large)
         .tint(.primary)
+        .modifier(SetupSecondaryButtonStyle())
+    }
+
+    private func playSymbolAnimation() {
+        symbolAnimationTrigger += 1
     }
 
     private func advance(to nextPage: Page) {
@@ -311,6 +341,28 @@ struct InitialSetupView: View {
             try? modelContext.save()
             isRequestingPhotoAccess = false
             advance(to: .finished)
+        }
+    }
+}
+
+private struct SetupPrimaryButtonStyle: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.buttonStyle(.glassProminent)
+        } else {
+            content.buttonStyle(.borderedProminent)
+        }
+    }
+}
+
+private struct SetupSecondaryButtonStyle: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.buttonStyle(.glass)
+        } else {
+            content.buttonStyle(.bordered)
         }
     }
 }

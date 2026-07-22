@@ -6,8 +6,8 @@
 import Foundation
 import Network
 
-final class LocalNetworkPermissionProbe {
-    enum Result {
+nonisolated final class LocalNetworkPermissionProbe: @unchecked Sendable {
+    enum Result: Sendable {
         case allowed
         case denied
         case unableToConfirm
@@ -18,10 +18,10 @@ final class LocalNetworkPermissionProbe {
     private let queue = DispatchQueue(label: "top.kitsune.filz.local-network-permission")
     private var browser: NWBrowser?
     private var listener: NWListener?
-    private var completion: ((Result) -> Void)?
+    private var completion: (@MainActor @Sendable (Result) -> Void)?
     private var hasCompleted = false
 
-    func request(completion: @escaping (Result) -> Void) {
+    func request(completion: @escaping @MainActor @Sendable (Result) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
             self.cancelCurrentRequest()
@@ -102,7 +102,7 @@ final class LocalNetworkPermissionProbe {
         hasCompleted = true
         let completion = completion
         cancelCurrentRequest()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             completion?(result)
         }
     }

@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct LocalSendDevice: Decodable, Identifiable, Hashable, Sendable {
+nonisolated struct LocalSendDevice: Decodable, Identifiable, Hashable, Sendable {
     let alias: String
     let version: String
     let deviceModel: String?

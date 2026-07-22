@@ -61,8 +61,7 @@ struct ContentView: View {
    var body: some View {
       TabView(selection: $selectedTab) {
          // Tab for sending stuff
-         Tab("Send", systemImage: "paperplane.fill", value: MainTab.send) {
-            NavigationStack {
+         NavigationStack {
                SendView(
                   selectDevice: { device in
                      coreStatus.selectDestination(device, replacingExisting: true)
@@ -114,16 +113,22 @@ struct ContentView: View {
                         allowsMultipleDestinations: attachmentAllowsMultipleDestinations
                      )
                   }
-            }
          }
+         .tabItem {
+            Label("Send", systemImage: "paperplane.fill")
+         }
+         .tag(MainTab.send)
+
          // Tab for History
-         Tab("History", systemImage: "clock.fill", value: MainTab.history) {
-            NavigationStack {
-               HistoryView()
-                  .navigationTitle("History")
-                  .toolbarTitleDisplayMode(.inlineLarge)
-            }
+         NavigationStack {
+            HistoryView()
+               .navigationTitle("History")
+               .toolbarTitleDisplayMode(.inlineLarge)
          }
+         .tabItem {
+            Label("History", systemImage: "clock.fill")
+         }
+         .tag(MainTab.history)
       }
       .onOpenURL { url in
          handleDeepLink(url)
